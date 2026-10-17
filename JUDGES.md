@@ -2,7 +2,7 @@
 
 Five minutes, in this order.
 
-1. **Watch the demo** (2 min): _link added after recording_.
+1. **Watch the demo** (2 min): [the launch film on X](https://x.com/heykinnu/status/2111607313870061804), with the real call audio and every payment on Base.
 2. **Open the live errand page**: [errand 0xd72f…b362](https://ladder-errands.vercel.app/e/0xd72f6F79c1dC2e8de3E5efea311C6B005BfBb362). On October 17 it called 24 Hour Fitness in San Diego to ask how a membership can be cancelled; a staff member answered (in person or online, not by mail). Every row links to Basescan: the $1.08 funding, the $0.54 release to step 1's key, that key's $0.54 payment to StablePhone, and the $0.54 refund.
 3. **Read the guarantee table** in the [README](README.md#what-the-chain-enforces-and-what-it-doesnt). It says what the contract enforces and what it leaves to the agent.
 4. **Run the tests** (needs Foundry and Node 24 with pnpm 11):

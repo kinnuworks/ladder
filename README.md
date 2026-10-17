@@ -8,7 +8,7 @@ The one approval funds an errand account on Base. The account can send each step
 
 **Proof (Base mainnet, October 17):** an AI call to 24 Hour Fitness in San Diego, asking whether a membership can be cancelled by phone or only in writing. The club said in person or online only, and that mailed cancellations aren't accepted. [Errand page](https://ladder-errands.vercel.app/e/0xd72f6F79c1dC2e8de3E5efea311C6B005BfBb362) · [funding $1.08](https://basescan.org/tx/0x4258949ef2347b775f918cd29b7ecfa46135ebc2db77704cc8ded3bcc75adfc8) · [errand opened](https://basescan.org/tx/0xb3d1808a23d7dee4cb70b25961f216c50e896fafc858cac8ff713b6dcd01a263) · [$0.54 released to step 1's key](https://basescan.org/tx/0x1d0fde1f29fa35c63cf058a3b3d5d1e155957f884befdbd445a844b3e5199b6d) · [step key paid StablePhone $0.54](https://basescan.org/tx/0x5607a7d50c3966b0301a0af5b14b484490ff10829c2465c5596e48471533c240) · [$0.54 refunded to the owner](https://basescan.org/tx/0x0a4893f728dcdc8c4eb94318038868e1894e71a8ed60109dbd9caf8cd9435e9e).
 
-[Live errand page](https://ladder-errands.vercel.app/e/0xd72f6F79c1dC2e8de3E5efea311C6B005BfBb362) · [For judges](JUDGES.md) · [Contracts on Basescan](https://basescan.org/address/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c) · [CI](../../actions) · Demo video: _link added when posted_
+[Live errand page](https://ladder-errands.vercel.app/e/0xd72f6F79c1dC2e8de3E5efea311C6B005BfBb362) · [For judges](JUDGES.md) · [Contracts on Basescan](https://basescan.org/address/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c) · [CI](../../actions) · [Demo video](https://x.com/heykinnu/status/2111607313870061804)
 
 ## Why it exists
 
