@@ -6,7 +6,10 @@
     "for_name": "Alex Example",
     "business_name": "Example Fitness",
     "business_phone": "+14155550100",
-    "steps": ["phone"],
-    "budget_usd": 2
+    "steps": [
+      "phone"
+    ],
+    "budget_usd": 2,
+    "business_timezone": "America/Los_Angeles"
   }
 }
