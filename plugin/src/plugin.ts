@@ -21,6 +21,12 @@ function refuse(code: string, reason: string) {
   return { content: [{ type: "text" as const, text: `Refused (${code}): ${reason}` }], structuredContent: { refused: true as const, code, reason } };
 }
 
+/** For tools that propose a payment: PayBox needs the proposal declared on its own in the output
+ *  schema, so a refusal goes back as an error result instead of a second output shape. */
+function refuseAsError(code: string, reason: string) {
+  return { content: [{ type: "text" as const, text: `Refused (${code}): ${reason}` }], isError: true };
+}
+
 async function getJson(path: string, init?: RequestInit) {
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 4000);
@@ -133,7 +139,7 @@ function createServer() {
       description:
         "Propose the single payment that funds the errand account. Before proposing, Ladder fetches the payment request itself and refuses unless the payee is exactly the errand address computed from the committed terms and the amount is exactly the budget. After the user approves in PayBox, the errand opens on Base.",
       inputSchema: z.object({ errand_key: errandKey }).strict(),
-      outputSchema: z.union([x402OutputSchema, refusal]),
+      outputSchema: x402OutputSchema,
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: true },
     },
     async ({ errand_key }) => {
@@ -147,10 +153,10 @@ function createServer() {
         }));
         const probe = await getJson("/api/fund", { method: "POST", body: JSON.stringify(body) });
         const problem = fundingProblem(probe, errand, budget);
-        if (problem) return refuse(problem.code, problem.reason);
+        if (problem) return refuseAsError(problem.code, problem.reason);
         return proposeX402({ chain: "eip155:8453", url: `${PUBLIC_URL}/api/fund`, method: "POST", body, maxAmount: budget });
       } catch (e) {
-        return refuse("FUND_FAILED", (e as Error).message);
+        return refuseAsError("FUND_FAILED", (e as Error).message);
       }
     },
   );
