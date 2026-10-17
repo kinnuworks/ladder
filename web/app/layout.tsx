@@ -16,7 +16,7 @@ export const viewport: Viewport = { themeColor: "#FFFFFF" };
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   const cfg = readConfig();
   return (
-    <html lang="en" data-accent="amber">
+    <html lang="en" data-accent="amber" suppressHydrationWarning>
       <head>
         <script dangerouslySetInnerHTML={{ __html: "document.documentElement.classList.add('js')" }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />

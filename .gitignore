@@ -9,3 +9,4 @@ plugin/dist/
 .vercel/
 .DS_Store
 contracts/broadcast/
+.claude/
