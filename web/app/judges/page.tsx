@@ -103,7 +103,7 @@ export default async function JudgesPage() {
       claim: "Contract source is verified against the deployed bytecode.",
       tag: sourceVerified ? "VERIFIED-LIVE" : "NOT-CLAIMED",
       how: sourceVerified
-        ? "Sourcify reports a match for the factory and the implementation."
+        ? "Basescan shows verified source for both contracts, and Sourcify reports a match."
         : "Not confirmed on Sourcify yet.",
       link: cfg.factory ? { href: sourcifyUrl(cfg.factory), text: "Sourcify" } : null,
     },
