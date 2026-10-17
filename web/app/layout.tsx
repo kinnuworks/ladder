@@ -9,7 +9,7 @@ export const metadata: Metadata = {
   metadataBase: new URL(process.env.PUBLIC_URL || "https://ladder-errands.vercel.app"),
   title: { default: "Ladder", template: "%s · Ladder" },
   description:
-    "Your AI can finally make the call. Ladder is a PayBox plugin: your AI calls the business, follows up, and mails a certified letter if needed, within one budget you approve. Each step is capped on Base, and what isn't spent comes back to you.",
+    "Give your AI a budget, not your card. Ladder is a PayBox plugin: your AI calls the business, follows up, and mails a certified letter if needed, within one budget you approve. Each step is capped on Base, and what isn't spent comes back to you.",
 };
 
 export const viewport: Viewport = { themeColor: "#FFFFFF" };

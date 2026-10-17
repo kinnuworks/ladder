@@ -1,6 +1,6 @@
 # Ladder
 
-**Your AI can finally make the call. You set the budget.**
+**Give your AI a budget, not your card.**
 
 Tell your AI: "Get my gym membership cancelled, up to $17." You approve once in PayBox. Your AI calls the gym. If the gym won't do it by phone, it calls again. If they insist on writing, it drafts a certified letter for you to approve and mails it with a return receipt. Whatever it doesn't spend comes back to you.
 

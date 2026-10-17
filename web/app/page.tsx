@@ -92,11 +92,11 @@ export default function Home() {
             Built for PayBox
           </span>
           <h1>
-            Your AI can <em className="t-serif">finally</em> make the call. You set the budget.
+            Give your AI a <em className="t-serif">budget</em>, not your card.
           </h1>
           <p className="lead">
-            It calls the business, follows up, and mails a certified letter if they insist on writing. You approve one
-            budget in PayBox, each step is capped on Base, and what it doesn&rsquo;t spend comes back to you.
+            Your AI calls the business, follows up, and mails a certified letter if they insist. You approve one budget
+            in PayBox, every step is capped on Base, and what it doesn&rsquo;t spend comes back to you.
           </p>
           <div className="cta-row">
             <a className="btn btn-candy btn-lg" href={add}>
