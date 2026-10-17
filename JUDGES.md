@@ -12,7 +12,7 @@ Five minutes, in this order.
    cd plugin && pnpm run interop   # deploys on a local Base fork and pays a step through real USDC
    cd web && pnpm install --frozen-lockfile && pnpm test
    ```
-5. **Check the addresses**: [ErrandFactory](https://basescan.org/address/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c), [Errand implementation](https://basescan.org/address/0xc580544b22560C97f360d3e40Fb48464D85E7c06), relayer [0x1959…182B](https://basescan.org/address/0x19591DDf7D49C8b41Ff1FcC0d0d83c8718eD182B).
+5. **Check the addresses**: [ErrandFactory](https://basescan.org/address/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c) and [Errand implementation](https://basescan.org/address/0xc580544b22560C97f360d3e40Fb48464D85E7c06), deployed in [this transaction](https://basescan.org/tx/0x89881e6862dd1ff3da3acf651fac11c17b64c57d5a5f2633230e2874c093f699) (block 52739302) and verified as an exact match on Sourcify ([factory](https://repo.sourcify.dev/8453/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c), [implementation](https://repo.sourcify.dev/8453/0xc580544b22560C97f360d3e40Fb48464D85E7c06)). Relayer: [0x1959…182B](https://basescan.org/address/0x19591DDf7D49C8b41Ff1FcC0d0d83c8718eD182B).
 
 ## Claims ledger
 
@@ -26,6 +26,7 @@ Each claim is tagged with how you can check it.
 | Claim | Status | Evidence |
 |---|---|---|
 | One PayBox approval funds an errand at an address fixed by its terms | VERIFIED-LIVE after the first errand; REPRODUCIBLE now | `plugin/test/interop.test.ts`; funding tx on the errand page |
+| The factory and errand code on Base match this repository | VERIFIED-LIVE | Sourcify exact match for both contracts; the plugin was built with these addresses before the deploy, and the deploy script refuses to run if they would differ |
 | The plugin recomputes the errand address and refuses to fund anything else | REPRODUCIBLE | `plugin/src/plugin.ts` (`ladder_fund`), `plugin/test/core.test.ts` |
 | An errand releases money only for a committed step, at most its cap, at most once, before expiry | REPRODUCIBLE | `contracts/test/Errand.t.sol`, `contracts/test/Invariants.t.sol` (8,192 random calls per run), `contracts/test/Fork.t.sol` against real Base USDC |
 | Real Base USDC accepts the errand's ERC-1271 signature and rejects a forged payee or a replay | REPRODUCIBLE | `forge test --match-contract ForkTest` with `BASE_RPC_URL` set |
