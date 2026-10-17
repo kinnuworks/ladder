@@ -124,3 +124,4 @@ textarea.input { width: 100%; min-height: 180px; padding: 12px 14px; border: 0; 
 textarea.input:focus { outline: 2px solid var(--focus); outline-offset: 2px; }
 .badges { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
 .badges img { height: 20px; }
+.app ol, .app .card ul:not(.checks) { margin: 0; padding-left: 1.25em; display: grid; gap: 8px; }

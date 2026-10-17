@@ -2,17 +2,37 @@
 import { useState } from "react";
 
 const TYPES = [
-  { id: "cancel", label: "Cancel a subscription", goal: "Cancel the membership and get the cancellation in writing.", who: "Northside Gym" },
-  { id: "refund", label: "Get a refund", goal: "Refund the charge for a class that was cancelled.", who: "Brightline Studio" },
-  { id: "dispute", label: "Dispute a charge", goal: "Reverse a renewal charge that was never authorized.", who: "Metro Cable" },
-  { id: "deposit", label: "Get a deposit back", goal: "Return the security deposit owed since move-out.", who: "Oak Street Rentals" },
+  {
+    id: "cancel",
+    label: "Cancel a subscription",
+    goal: "Cancel the membership and get the cancellation in writing.",
+    who: "Northside Gym",
+  },
+  {
+    id: "refund",
+    label: "Get a refund",
+    goal: "Refund the charge for a class that was cancelled.",
+    who: "Brightline Studio",
+  },
+  {
+    id: "dispute",
+    label: "Dispute a charge",
+    goal: "Reverse a renewal charge that was never authorized.",
+    who: "Metro Cable",
+  },
+  {
+    id: "deposit",
+    label: "Get a deposit back",
+    goal: "Return the security deposit owed since move-out.",
+    who: "Oak Street Rentals",
+  },
 ] as const;
 
 const STEPS = [
   { id: "call", label: "AI call", detail: "StablePhone", cap: 0.54 },
   { id: "followup", label: "Follow-up AI call", detail: "StablePhone", cap: 0.54 },
   { id: "person", label: "A person calls", detail: "Mosbie", cap: 15 },
-  { id: "letter", label: "Certified letter", detail: "PostalForm", cap: 20 },
+  { id: "letter", label: "Certified letter", detail: "PostalForm", cap: 15 },
 ] as const;
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -37,7 +57,13 @@ export function TryIt() {
           </span>
           <div className="chips" role="group" aria-labelledby="try-type">
             {TYPES.map((x) => (
-              <button key={x.id} type="button" className="chip" aria-pressed={x.id === type} onClick={() => setType(x.id)}>
+              <button
+                key={x.id}
+                type="button"
+                className="chip"
+                aria-pressed={x.id === type}
+                onClick={() => setType(x.id)}
+              >
                 {x.label}
               </button>
             ))}

@@ -14,10 +14,13 @@ describe("funding policy", () => {
     expect(r.ok && r.errand).toBe(errand);
   });
 
-  it("drops private brief fields from the plan", () => {
+  it("keeps only the business name and rungs from the plan", () => {
     const { body, now } = fixture();
-    const r = checkFundRequest(body, cfg, now);
-    expect(r.ok && r.plan).toEqual({ goal: "Cancel the gym membership", business: "Northside Gym", rungs: body.plan.rungs });
+    const b = structuredClone(body) as any;
+    b.plan.goal = "Cancel the gym membership";
+    b.plan.replyEmail = "sam@example.com";
+    const r = checkFundRequest(b, cfg, now);
+    expect(r.ok && r.plan).toEqual({ business: "Northside Gym", rungs: body.plan.rungs });
   });
 
   const reject = (mutate: (b: any) => void, match: RegExp) => {
@@ -36,11 +39,13 @@ describe("funding policy", () => {
   });
 
   it("rejects budgets over 100 USDC", () => reject((b) => (b.budget = "100000001"), /100 USDC/));
+  it("rejects budgets under 1 USDC", () => reject((b) => (b.budget = "999999"), /under 1 USDC/));
   it("rejects a foreign factory", () => reject((b) => (b.terms.factory = other.address), /factory/));
   it("rejects an unknown rail", () => reject((b) => (b.plan.rungs[0].rail = "fax"), /rail/));
   it("rejects a cap above the rail cap", () => {
     reject((b) => (b.plan.rungs[0].max = "540001"), /rail cap/);
-    reject((b) => (b.plan.rungs[2].max = "20000001"), /rail cap/);
+    reject((b) => (b.plan.rungs[1].max = "15000001"), /rail cap/);
+    reject((b) => (b.plan.rungs[2].max = "15000001"), /rail cap/);
   });
   it("accepts any runner address on a rung", () => {
     const { body, now } = fixture();

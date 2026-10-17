@@ -31,11 +31,11 @@ export function fixture(now = Math.floor(Date.now() / 1000)) {
   };
   const errand = predictErrand(terms);
   const plan = {
-    brief: { goal: "Cancel the gym membership", forName: "Sam", business: { name: "Northside Gym", phone: "+15555550100" }, replyEmail: "sam@example.com" },
+    business: "Northside Gym",
     rungs: [
       { rail: "phone", label: "AI call to Northside Gym", to: runners.phone, max: "540000" },
       { rail: "human", label: "A person calls Northside Gym", to: runners.human, max: "15000000" },
-      { rail: "mail", label: "Certified letter to Northside Gym", to: runners.mail, max: "20000000" },
+      { rail: "mail", label: "Certified letter to Northside Gym", to: runners.mail, max: "15000000" },
     ],
   };
   const body = {

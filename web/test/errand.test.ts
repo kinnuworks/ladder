@@ -74,7 +74,7 @@ describe("errand timeline shaping", () => {
     expect(v.timeline.every((r) => r.txUrl.startsWith("https://basescan.org/tx/0x"))).toBe(true);
     expect(v.rungs.map((r) => r.state)).toEqual(["paid", "unused", "paid"]);
     expect(v.rungs[2]!.checks.every((c) => c.ok)).toBe(true);
-    expect(v.plan).toEqual({ goal: "Cancel the gym membership", business: "Northside Gym" });
+    expect(v.plan).toEqual({ business: "Northside Gym" });
   });
 
   it("flags an errand payment to an address that is not a planned runner", () => {
@@ -135,7 +135,8 @@ describe("plan links", () => {
     const back = decodePlanParam(encodePlanParam(parsed));
     expect(back.error).toBeNull();
     expect(back.plan).toEqual(parsed);
-    expect(Buffer.from(encodePlanParam(parsed), "base64url").toString()).not.toMatch(/example\.com|5555/);
+    const withExtras = planSchema.parse({ ...plan, goal: "Cancel the gym membership", replyEmail: "sam@example.com" });
+    expect(Buffer.from(encodePlanParam(withExtras), "base64url").toString()).not.toMatch(/goal|Cancel|example\.com/);
   });
 
   it("report a broken plan without throwing", () => {

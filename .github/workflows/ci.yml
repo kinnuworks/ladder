@@ -45,11 +45,11 @@ jobs:
       - name: PayBox conformance (typecheck, two byte-identical builds, protocol checks)
         run: pnpm test
 
-  backend:
+  web:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: backend
+        working-directory: web
     steps:
       - uses: actions/checkout@v4
       - uses: pnpm/action-setup@v4
@@ -58,6 +58,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24.21.0
+          cache: pnpm
+          cache-dependency-path: web/pnpm-lock.yaml
       - run: pnpm install --frozen-lockfile
       - run: pnpm run typecheck
-      - run: pnpm test
+      - name: core.ts drift check and unit tests
+        run: pnpm test
+      - run: pnpm run build

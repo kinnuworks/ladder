@@ -22,7 +22,7 @@ const RUNGS = [
   { title: "AI call", detail: "StablePhone calls the business", cap: "$0.54" },
   { title: "Follow-up AI call", detail: "StablePhone calls again", cap: "$0.54" },
   { title: "A person calls", detail: "Mosbie, results by email", cap: "$15.00" },
-  { title: "Certified letter", detail: "PostalForm, USPS with return receipt", cap: "$20.00" },
+  { title: "Certified letter", detail: "PostalForm, USPS with return receipt", cap: "$15.00" },
 ];
 
 const FAQ = [
@@ -80,8 +80,8 @@ export default function Home() {
             Get a real errand <em className="t-serif">done</em> with one approval.
           </h1>
           <p className="lead">
-            Tell your AI what you need and how much it may spend. It calls the business, brings in a person if that fails,
-            then sends a certified letter. Money it does not use comes back to you.
+            Tell your AI what you need and how much it may spend. It calls the business, brings in a person if that
+            fails, then sends a certified letter. Money it does not use comes back to you.
           </p>
           <div className="cta-row">
             <a className="btn btn-candy btn-lg" href={add}>
@@ -119,7 +119,7 @@ export default function Home() {
                         <li>AI call to Northside Gym, up to $0.54</li>
                         <li>Follow-up AI call, up to $0.54</li>
                         <li>A person calls for you, up to $15</li>
-                        <li>Certified letter with return receipt, up to $20</li>
+                        <li>Certified letter with return receipt, up to $15</li>
                       </ol>
                       Anything left goes back to your wallet. Approve $30 in PayBox to start.
                     </div>
@@ -163,7 +163,7 @@ export default function Home() {
                       </li>
                       <li>
                         <span>Certified letter</span>
-                        <span>$20.00, once</span>
+                        <span>$15.00, once</span>
                       </li>
                     </ul>
                     <div className="t-micro">The rest returns to you. Expires in 72 hours.</div>
@@ -279,7 +279,9 @@ export default function Home() {
                 ].map(([text, chain]) => (
                   <div className="row" key={String(text)}>
                     <span>{text}</span>
-                    <span className={`who-tag${chain ? " chain" : ""}`}>{chain ? "Base enforces" : "Agent decides"}</span>
+                    <span className={`who-tag${chain ? " chain" : ""}`}>
+                      {chain ? "Base enforces" : "Agent decides"}
+                    </span>
                   </div>
                 ))}
               </div>
@@ -362,12 +364,36 @@ export default function Home() {
           </div>
           <div className="grid grid-3">
             {[
-              [<IconDatabaseOff key="i" />, "No database", "Pages read Base when they load. The site keeps no record of you or your errands."],
-              [<IconUndo key="i" />, "Refunds go only to you", "After expiry anyone can trigger the refund, and it can only reach the wallet that funded the errand."],
-              [<IconMapPin key="i" />, "US numbers and addresses", "The calling and mail services reach US phone numbers and US postal addresses only."],
-              [<IconLock key="i" />, "Address fixed by the terms", "The errand address is computed from its terms, so anyone can check what it may pay before it holds money."],
-              [<IconCode key="i" />, "Open source", "The contracts, the PayBox plugin and this site live in one repository, each with its own tests."],
-              [<IconCheckCircle key="i" />, "Checked on every push", "CI runs contract fuzz and invariant tests, fork tests against Base USDC and the plugin conformance build."],
+              [
+                <IconDatabaseOff key="i" />,
+                "No database",
+                "Pages read Base when they load. The site keeps no record of you or your errands.",
+              ],
+              [
+                <IconUndo key="i" />,
+                "Refunds go only to you",
+                "After expiry anyone can trigger the refund, and it can only reach the wallet that funded the errand.",
+              ],
+              [
+                <IconMapPin key="i" />,
+                "US numbers and addresses",
+                "The calling and mail services reach US phone numbers and US postal addresses only.",
+              ],
+              [
+                <IconLock key="i" />,
+                "Address fixed by the terms",
+                "The errand address is computed from its terms, so anyone can check what it may pay before it holds money.",
+              ],
+              [
+                <IconCode key="i" />,
+                "Open source",
+                "The contracts, the PayBox plugin and this site live in one repository, each with its own tests.",
+              ],
+              [
+                <IconCheckCircle key="i" />,
+                "Checked on every push",
+                "CI runs contract fuzz and invariant tests, fork tests against Base USDC and the plugin conformance build.",
+              ],
             ].map(([icon, title, text], i) => (
               <div className="tile reveal" key={String(title)} style={{ ["--i" as string]: i % 3 }}>
                 <span className="icon-tile">{icon}</span>
@@ -404,7 +430,8 @@ export default function Home() {
             Hand off the errand. <span className="t-muted">Keep the change.</span>
           </h2>
           <p className="lead" style={{ margin: "18px auto 0" }}>
-            Ladder is a PayBox plugin. Add it, then ask your agent to get something done and tell it the most it may spend.
+            Ladder is a PayBox plugin. Add it, then ask your agent to get something done and tell it the most it may
+            spend.
           </p>
           <div className="cta-row">
             <a className="btn btn-candy btn-lg" href={add}>

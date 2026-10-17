@@ -75,7 +75,11 @@ export default async function ErrandPage({ params, searchParams }: Props) {
           <div className="card stat">
             <span className="t-micro">{v.expiresIn !== null && v.expiresIn <= 0 ? "Expired" : "Expires in"}</span>
             <span className="value">
-              {v.expiresIn === null ? "Not set" : v.expiresIn > 0 ? duration(v.expiresIn) : `${duration(v.expiresIn)} ago`}
+              {v.expiresIn === null
+                ? "Not set"
+                : v.expiresIn > 0
+                  ? duration(v.expiresIn)
+                  : `${duration(v.expiresIn)} ago`}
             </span>
           </div>
         </div>

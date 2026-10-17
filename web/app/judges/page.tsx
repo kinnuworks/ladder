@@ -9,7 +9,12 @@ export const metadata: Metadata = { title: "For judges" };
 export const revalidate = 300;
 
 type Tag = "VERIFIED-LIVE" | "REPRODUCIBLE" | "MODELED" | "NOT-CLAIMED";
-const TAG_CLASS: Record<Tag, string> = { "VERIFIED-LIVE": "live", REPRODUCIBLE: "repro", MODELED: "modeled", "NOT-CLAIMED": "not" };
+const TAG_CLASS: Record<Tag, string> = {
+  "VERIFIED-LIVE": "live",
+  REPRODUCIBLE: "repro",
+  MODELED: "modeled",
+  "NOT-CLAIMED": "not",
+};
 
 interface Claim {
   claim: string;
@@ -41,12 +46,16 @@ export default async function JudgesPage() {
     ? `/e/${cfg.exampleErrand}${cfg.examplePlan ? `?plan=${encodeURIComponent(cfg.examplePlan)}` : ""}`
     : null;
   const live = (fallback: Tag) => (example ? "VERIFIED-LIVE" : fallback);
-  const [factoryVerified, implVerified] = await Promise.all([sourcifyMatch(cfg.factory), sourcifyMatch(cfg.implementation)]);
+  const [factoryVerified, implVerified] = await Promise.all([
+    sourcifyMatch(cfg.factory),
+    sourcifyMatch(cfg.implementation),
+  ]);
   const sourceVerified = factoryVerified === true && implVerified === true;
 
   const claims: Claim[] = [
     {
-      claim: "An errand's address is fixed by its terms before the errand exists, so it can be funded first and checked by anyone.",
+      claim:
+        "An errand's address is fixed by its terms before the errand exists, so it can be funded first and checked by anyone.",
       tag: live("REPRODUCIBLE"),
       how: example
         ? "Open the example errand, copy its terms into the verify page, and compare with factory.predict() on Base."
@@ -74,7 +83,8 @@ export default async function JudgesPage() {
       link: example ? { href: example, text: "Example errand" } : src("web/test/x402.test.ts"),
     },
     {
-      claim: "Each step uses a one-time key that receives at most its cap from the errand and pays the service directly.",
+      claim:
+        "Each step uses a one-time key that receives at most its cap from the errand and pays the service directly.",
       tag: live("MODELED"),
       how: example
         ? "On the example errand, each release is followed by the step key's payment to the service."
@@ -82,7 +92,8 @@ export default async function JudgesPage() {
       link: example ? { href: example, text: "Example errand" } : src("plugin/src/rails.ts"),
     },
     {
-      claim: "Prices: StablePhone $0.54 per call, Mosbie $15 per task, PostalForm $11.40 to $14.40 per certified letter.",
+      claim:
+        "Prices: StablePhone $0.54 per call, Mosbie $15 per task, PostalForm $11.40 to $14.40 per certified letter.",
       tag: "MODELED",
       how: "Taken from each service's payment request when the rails were built. Prices can change; rung caps bound what is paid.",
       link: src("docs/RAILS.md"),
@@ -96,7 +107,9 @@ export default async function JudgesPage() {
     {
       claim: "Contract source is verified against the deployed bytecode.",
       tag: sourceVerified ? "VERIFIED-LIVE" : "NOT-CLAIMED",
-      how: sourceVerified ? "Sourcify reports a match for the factory and the implementation." : "Not yet confirmed on Sourcify.",
+      how: sourceVerified
+        ? "Sourcify reports a match for the factory and the implementation."
+        : "Not yet confirmed on Sourcify.",
       link: cfg.factory ? { href: sourcifyUrl(cfg.factory), text: "Sourcify" } : null,
     },
     {
@@ -114,161 +127,188 @@ export default async function JudgesPage() {
   ];
 
   return (
-    <main className="wrap wide">
-      <h1>For judges</h1>
-      <p className="lede">
-        What Ladder claims, how each claim can be checked, and where the code is. Every claim below carries one of four
-        tags.
-      </p>
-      <dl className="terms small">
-        <dt>
-          <span className="tag live">VERIFIED-LIVE</span>
-        </dt>
-        <dd>Visible on Base mainnet now, linked.</dd>
-        <dt>
-          <span className="tag repro">REPRODUCIBLE</span>
-        </dt>
-        <dd>Shown by a test you can run, including fork tests against real Base USDC.</dd>
-        <dt>
-          <span className="tag modeled">MODELED</span>
-        </dt>
-        <dd>Built and reasoned about, but not yet observed on mainnet.</dd>
-        <dt>
-          <span className="tag not">NOT-CLAIMED</span>
-        </dt>
-        <dd>Something Ladder does not claim.</dd>
-      </dl>
-
-      <h2>A five-minute review</h2>
-      <ol className="steps">
-        <li>
-          {example ? (
-            <>
-              Open <Link href={example}>the example errand</Link>. Check the funding row, that each release is at or under
-              its cap, and that the leftover went back to the owner.
-            </>
-          ) : (
-            <>Open an errand page from the agent&rsquo;s output. Each row links to Basescan.</>
-          )}
-        </li>
-        <li>
-          Copy the terms from that page into <Link href="/verify">verify</Link>. The address it computes should match the
-          page you came from and factory.predict() on Base.
-        </li>
-        <li>
-          Read <code>Errand.isValidSignature</code> in{" "}
-          {repo ? <a href={`${repo}/blob/HEAD/contracts/src/Errand.sol`}>contracts/src/Errand.sol</a> : <code>contracts/src/Errand.sol</code>}
-          . It is short, and it is the only way money leaves the errand other than a refund to the owner.
-        </li>
-        <li>
-          Run the tests: <code>forge test</code> in <code>contracts</code>, <code>pnpm test</code> in <code>plugin</code>{" "}
-          and <code>web</code>.
-        </li>
-        <li>
-          Check <a href="/api/health">/api/health</a> to see which factory this site uses and that the relayer only holds
-          gas.
-        </li>
-      </ol>
-
-      <h2>Claims</h2>
-      <div className="table-scroll">
-        <table>
-          <thead>
-            <tr>
-              <th>Claim</th>
-              <th>Tag</th>
-              <th>How to check</th>
-            </tr>
-          </thead>
-          <tbody>
-            {claims.map((c, i) => (
-              <tr key={i}>
-                <td>{c.claim}</td>
-                <td>
-                  <span className={`tag ${TAG_CLASS[c.tag]}`}>{c.tag}</span>
-                </td>
-                <td>
-                  {c.how}
-                  {c.link && (
-                    <>
-                      <br />
-                      {c.link.href ? (
-                        <a href={c.link.href} className="small">
-                          {c.link.text}
-                        </a>
-                      ) : (
-                        <code className="small">{c.link.text}</code>
-                      )}
-                    </>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <h2>Tests and CI</h2>
-      {repo ? (
-        <div className="badges">
-          <a href={`${repo}/actions/workflows/ci.yml`}>
-            <img src={`${repo}/actions/workflows/ci.yml/badge.svg`} alt="CI status" />
-          </a>
+    <main className="page app">
+      <div className="container">
+        <h1>For judges.</h1>
+        <p className="lead">
+          What Ladder claims, how each claim can be checked, and where the code is. Every claim below carries one of
+          four tags.
+        </p>
+        <div className="card" style={{ marginTop: 24 }}>
+          <dl className="kv">
+            <dt>
+              <span className="claim-tag live">VERIFIED-LIVE</span>
+            </dt>
+            <dd>Visible on Base mainnet now, linked.</dd>
+            <dt>
+              <span className="claim-tag repro">REPRODUCIBLE</span>
+            </dt>
+            <dd>Shown by a test you can run, including fork tests against real Base USDC.</dd>
+            <dt>
+              <span className="claim-tag modeled">MODELED</span>
+            </dt>
+            <dd>Built and reasoned about, but not yet observed on mainnet.</dd>
+            <dt>
+              <span className="claim-tag not">NOT-CLAIMED</span>
+            </dt>
+            <dd>Something Ladder does not claim.</dd>
+          </dl>
         </div>
-      ) : (
-        <p className="muted small">The CI badge appears here once REPO_URL is set.</p>
-      )}
-      <ul>
-        <li>Contracts: unit, fuzz and invariant tests, and fork tests against Base USDC (Foundry).</li>
-        <li>Plugin: core unit tests, a Base-fork interop test, and the PayBox conformance build.</li>
-        <li>Site: x402 response shape, payment header checks, errand timeline shaping, and the core.ts drift check.</li>
-      </ul>
 
-      <h2>Contracts on Base</h2>
-      {cfg.factory || cfg.implementation ? (
-        <dl className="terms">
-          {cfg.factory && (
-            <>
-              <dt>ErrandFactory</dt>
-              <dd>
-                <Addr a={cfg.factory} full />
-                <br />
-                <a className="small" href={addressUrl(cfg.factory)}>
-                  Basescan
-                </a>{" "}
-                ·{" "}
-                <a className="small" href={sourcifyUrl(cfg.factory)}>
-                  Sourcify
+        <section className="app-section">
+          <h2>A five-minute review.</h2>
+          <div className="card">
+            <ol className="steps">
+              <li>
+                {example ? (
+                  <>
+                    Open <Link href={example}>the example errand</Link>. Check the funding row, that each release is at
+                    or under its cap, and that the leftover went back to the owner.
+                  </>
+                ) : (
+                  <>Open an errand page from the agent&rsquo;s output. Each row links to Basescan.</>
+                )}
+              </li>
+              <li>
+                Copy the terms from that page into <Link href="/verify">verify</Link>. The address it computes should
+                match the page you came from and factory.predict() on Base.
+              </li>
+              <li>
+                Read <code>Errand.isValidSignature</code> in{" "}
+                {repo ? (
+                  <a href={`${repo}/blob/HEAD/contracts/src/Errand.sol`}>contracts/src/Errand.sol</a>
+                ) : (
+                  <code>contracts/src/Errand.sol</code>
+                )}
+                . It is short, and it is the only way money leaves the errand other than a refund to the owner.
+              </li>
+              <li>
+                Run the tests: <code>forge test</code> in <code>contracts</code>, <code>pnpm test</code> in{" "}
+                <code>plugin</code> and <code>web</code>.
+              </li>
+              <li>
+                Check <a href="/api/health">/api/health</a> to see which factory this site uses and that the relayer
+                only holds gas.
+              </li>
+            </ol>
+          </div>
+        </section>
+
+        <section className="app-section">
+          <h2>Claims.</h2>
+          <div className="table-wrap">
+            <table className="data">
+              <thead>
+                <tr>
+                  <th>Claim</th>
+                  <th>Tag</th>
+                  <th>How to check</th>
+                </tr>
+              </thead>
+              <tbody>
+                {claims.map((c, i) => (
+                  <tr key={i}>
+                    <td>{c.claim}</td>
+                    <td>
+                      <span className={`claim-tag ${TAG_CLASS[c.tag]}`}>{c.tag}</span>
+                    </td>
+                    <td>
+                      {c.how}
+                      {c.link && (
+                        <>
+                          <br />
+                          {c.link.href ? (
+                            <a href={c.link.href} className="t-small">
+                              {c.link.text}
+                            </a>
+                          ) : (
+                            <code className="t-small">{c.link.text}</code>
+                          )}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section className="app-section">
+          <h2>Tests and CI.</h2>
+          <div className="card">
+            {repo ? (
+              <div className="badges">
+                <a href={`${repo}/actions/workflows/ci.yml`}>
+                  <img src={`${repo}/actions/workflows/ci.yml/badge.svg`} alt="CI status" />
                 </a>
-                {factoryVerified === true && <span className="small muted"> (verified)</span>}
-              </dd>
-            </>
-          )}
-          {cfg.implementation && (
-            <>
-              <dt>Errand implementation</dt>
-              <dd>
-                <Addr a={cfg.implementation} full />
-                <br />
-                <a className="small" href={addressUrl(cfg.implementation)}>
-                  Basescan
-                </a>{" "}
-                ·{" "}
-                <a className="small" href={sourcifyUrl(cfg.implementation)}>
-                  Sourcify
-                </a>
-                {implVerified === true && <span className="small muted"> (verified)</span>}
-              </dd>
-            </>
-          )}
-          <dt>USDC</dt>
-          <dd>
-            <Addr a="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" full />
-          </dd>
-        </dl>
-      ) : (
-        <p className="muted">Contract addresses appear here once FACTORY_ADDRESS and IMPLEMENTATION_ADDRESS are set.</p>
-      )}
+              </div>
+            ) : (
+              <p className="t-small">The CI badge appears here once REPO_URL is set.</p>
+            )}
+            <ul>
+              <li>Contracts: unit, fuzz and invariant tests, and fork tests against Base USDC (Foundry).</li>
+              <li>Plugin: core unit tests, a Base-fork interop test, and the PayBox conformance build.</li>
+              <li>
+                Site: x402 response shapes, payment header checks, funding, release and finish validation, errand
+                timeline shaping, and the core.ts drift check.
+              </li>
+            </ul>
+          </div>
+        </section>
+
+        <section className="app-section">
+          <h2>Contracts on Base.</h2>
+          <div className="card">
+            {cfg.factory || cfg.implementation ? (
+              <dl className="kv">
+                {cfg.factory && (
+                  <>
+                    <dt>ErrandFactory</dt>
+                    <dd>
+                      <Addr a={cfg.factory} full />
+                      <br />
+                      <a className="t-small" href={addressUrl(cfg.factory)}>
+                        Basescan
+                      </a>{" "}
+                      ·{" "}
+                      <a className="t-small" href={sourcifyUrl(cfg.factory)}>
+                        Sourcify
+                      </a>
+                      {factoryVerified === true && <span className="t-micro"> (verified)</span>}
+                    </dd>
+                  </>
+                )}
+                {cfg.implementation && (
+                  <>
+                    <dt>Errand implementation</dt>
+                    <dd>
+                      <Addr a={cfg.implementation} full />
+                      <br />
+                      <a className="t-small" href={addressUrl(cfg.implementation)}>
+                        Basescan
+                      </a>{" "}
+                      ·{" "}
+                      <a className="t-small" href={sourcifyUrl(cfg.implementation)}>
+                        Sourcify
+                      </a>
+                      {implVerified === true && <span className="t-micro"> (verified)</span>}
+                    </dd>
+                  </>
+                )}
+                <dt>USDC</dt>
+                <dd>
+                  <Addr a="0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913" full />
+                </dd>
+              </dl>
+            ) : (
+              <p className="t-small">
+                Contract addresses appear here once FACTORY_ADDRESS and IMPLEMENTATION_ADDRESS are set.
+              </p>
+            )}
+          </div>
+        </section>
+      </div>
     </main>
   );
 }

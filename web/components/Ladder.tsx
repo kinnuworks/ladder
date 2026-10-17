@@ -27,7 +27,15 @@ export function Ladder({ rungs, title }: { rungs: LadderRung[]; title: string })
           const yy = y(i);
           return (
             <g key={i}>
-              <line className={`rung${active ? " is-active" : ""}`} x1={left} y1={yy} x2={right} y2={yy} strokeWidth={active ? 7 : 5} strokeLinecap="round" />
+              <line
+                className={`rung${active ? " is-active" : ""}`}
+                x1={left}
+                y1={yy}
+                x2={right}
+                y2={yy}
+                strokeWidth={active ? 7 : 5}
+                strokeLinecap="round"
+              />
               <text className="label" x={textX} y={yy - 6}>
                 {r.title}
               </text>
