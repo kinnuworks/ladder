@@ -1,7 +1,7 @@
 // The errand page's data: read terms, balance and USDC transfers from chain, then shape them
 // into a timeline. `shapeErrand` is pure so it can be tested against mocked logs.
 import { type Address, type Hex, getAddress } from "viem";
-import { USDC } from "./core";
+import { USDC, buildTree, rungLeaf } from "./core";
 import { errandAbi, factoryAbi, publicClient, usdcAbi } from "./chain";
 import { readConfig } from "./config";
 import { addressUrl, isoTime, txUrl, usd } from "./format";
@@ -98,6 +98,14 @@ export interface ErrandView {
   planIssues: string[];
   flags: string[];
   runnersKnown: boolean;
+  /**
+   * Whether the plan's labels are tied to the chain: "matches" when every rung carries its nonce
+   * and salt and the rebuilt root equals the errand's rungsRoot, "mismatch" when it differs,
+   * "unverified" otherwise. Null without a plan.
+   */
+  planCommitment: "matches" | "mismatch" | "unverified" | null;
+  /** USDC sits at the address but no errand contract was ever opened there. */
+  fundedButNotOpened: boolean;
   updatedAt: number;
 }
 
@@ -107,6 +115,13 @@ function blockTime(raw: RawErrand, block: bigint): number {
 
 function order(a: TransferLog, b: TransferLog) {
   return a.block === b.block ? a.logIndex - b.logIndex : a.block < b.block ? -1 : 1;
+}
+
+/** Rebuild the rungs root from a plan whose rungs all carry nonce and salt, and compare it with the chain. */
+export function planCommitment(plan: Plan, onChainRoot: Hex | null): "matches" | "mismatch" | "unverified" {
+  if (!onChainRoot || !plan.rungs.every((r) => r.nonce && r.salt)) return "unverified";
+  const leaves = plan.rungs.map((r) => rungLeaf({ nonce: r.nonce!, to: r.to, max: BigInt(r.max), salt: r.salt! }));
+  return buildTree(leaves).root.toLowerCase() === onChainRoot.toLowerCase() ? "matches" : "mismatch";
 }
 
 export function shapeErrand(raw: RawErrand): ErrandView {
@@ -200,6 +215,10 @@ export function shapeErrand(raw: RawErrand): ErrandView {
     }
   }
 
+  if (plan && raw.state && planCommitment(plan, raw.state.rungsRoot) === "mismatch") {
+    flags.push("The plan in this link does not match the rungs this errand committed to on chain. Its labels are not trustworthy.");
+  }
+
   rows.sort((a, b) => (a.block === b.block ? 0 : BigInt(a.block) < BigInt(b.block) ? -1 : 1));
 
   const rungs: RungView[] = (plan?.rungs ?? []).map((r, i) => {
@@ -252,6 +271,8 @@ export function shapeErrand(raw: RawErrand): ErrandView {
     planIssues,
     flags,
     runnersKnown: !!plan,
+    planCommitment: plan ? planCommitment(plan, s?.rungsRoot ?? null) : null,
+    fundedButNotOpened: !s && raw.balance > 0n,
     updatedAt: raw.now,
   };
 }

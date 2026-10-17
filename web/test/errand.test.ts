@@ -1,6 +1,7 @@
 import { type Address, type Hex, getAddress } from "viem";
 import { describe, expect, it } from "vitest";
-import { type RawErrand, type TransferLog, shapeErrand } from "../lib/errand";
+import { buildTree, randomHex32, rungLeaf } from "../lib/core";
+import { type RawErrand, type TransferLog, planCommitment, shapeErrand } from "../lib/errand";
 import { decodePlanParam, encodePlanParam, planSchema } from "../lib/schema";
 import { fixture, owner, runners } from "./helpers";
 
@@ -142,5 +143,62 @@ describe("plan links", () => {
   it("report a broken plan without throwing", () => {
     expect(decodePlanParam("not-json").error).toMatch(/decoded/);
     expect(decodePlanParam(Buffer.from('{"rungs":[]}').toString("base64url")).error).toMatch(/shape/);
+  });
+});
+
+describe("plan labels against the on-chain commitment", () => {
+  function committed() {
+    const { plan } = fixture();
+    const rungs = plan.rungs.map((r) => ({ ...r, nonce: randomHex32(), salt: randomHex32() }));
+    const { root } = buildTree(rungs.map((r) => rungLeaf({ nonce: r.nonce, to: r.to, max: BigInt(r.max), salt: r.salt })));
+    return { plan: planSchema.parse({ business: plan.business, rungs }), root };
+  }
+
+  it("matches when every rung carries nonce and salt and the root agrees", () => {
+    const { plan, root } = committed();
+    expect(planCommitment(plan, root)).toBe("matches");
+    const base = raw();
+    const v = shapeErrand({ ...base, plan, state: { ...base.state!, rungsRoot: root } });
+    expect(v.planCommitment).toBe("matches");
+    expect(v.flags).toEqual([]);
+  });
+
+  it("flags a plan whose rungs differ from the commitment", () => {
+    const { plan, root } = committed();
+    const tampered = { ...plan, rungs: plan.rungs.map((r, i) => (i === 0 ? { ...r, max: "540001" } : r)) };
+    expect(planCommitment(tampered, root)).toBe("mismatch");
+    const base = raw();
+    const v = shapeErrand({ ...base, plan: tampered, state: { ...base.state!, rungsRoot: root } });
+    expect(v.planCommitment).toBe("mismatch");
+    expect(v.flags.some((f) => /does not match the rungs/.test(f))).toBe(true);
+  });
+
+  it("flags a reordered plan", () => {
+    const { plan, root } = committed();
+    expect(planCommitment({ ...plan, rungs: [...plan.rungs].reverse() }, root)).toBe("mismatch");
+  });
+
+  it("calls labels unverified without nonce and salt, or before the errand is opened", () => {
+    const { plan, root } = committed();
+    const bare = planSchema.parse({ business: plan.business, rungs: plan.rungs.map(({ nonce, salt, ...r }) => r) });
+    expect(planCommitment(bare, root)).toBe("unverified");
+    expect(planCommitment(plan, null)).toBe("unverified");
+    expect(shapeErrand(raw({ plan: bare })).planCommitment).toBe("unverified");
+  });
+
+  it("accepts the plugin's link shape", () => {
+    const { plan } = committed();
+    const link = Buffer.from(JSON.stringify({ business: plan.business, rungs: plan.rungs })).toString("base64url");
+    const back = decodePlanParam(link);
+    expect(back.error).toBeNull();
+    expect(back.plan!.rungs[0]!.nonce).toBe(plan.rungs[0]!.nonce);
+  });
+});
+
+describe("funded but never opened", () => {
+  it("is reported when USDC sits at an address with no errand contract", () => {
+    const v = shapeErrand(raw({ state: null, opened: null, balance: 16_080_000n }));
+    expect(v.fundedButNotOpened).toBe(true);
+    expect(shapeErrand(raw({ state: null, opened: null, balance: 0n })).fundedButNotOpened).toBe(false);
   });
 });

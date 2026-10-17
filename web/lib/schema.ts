@@ -39,6 +39,9 @@ export const planRungSchema = z.object({
   /** The rung's one-time runner address. */
   to: address,
   max: uintString,
+  /** Optional, public: with every rung's nonce and salt the page can rebuild the committed root. */
+  nonce: bytes32.optional(),
+  salt: bytes32.optional(),
 });
 
 /** The public plan the plugin sends: the business name and the committed rungs. No goal, no contact details. */
