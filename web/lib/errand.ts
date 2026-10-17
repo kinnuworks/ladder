@@ -266,11 +266,10 @@ export async function logsAdaptive<T>(from: bigint, to: bigint, fetch: (from: bi
     return await fetch(from, to);
   } catch (err) {
     if (depth >= MAX_SPLIT_DEPTH || to <= from) throw err;
+    // Halves run one after the other so a range-limited RPC is not hit with a burst.
     const mid = from + (to - from) / 2n;
-    const [a, b] = await Promise.all([
-      logsAdaptive(from, mid, fetch, depth + 1),
-      logsAdaptive(mid + 1n, to, fetch, depth + 1),
-    ]);
+    const a = await logsAdaptive(from, mid, fetch, depth + 1);
+    const b = await logsAdaptive(mid + 1n, to, fetch, depth + 1);
     return [...a, ...b];
   }
 }
