@@ -114,7 +114,7 @@ export default function Home() {
 
           <div className="hero__visual bleed">
             <div className="stage" aria-hidden="true">
-              <span className="chip example-chip">Example</span>
+              <span className="chip example-chip">Real errand · Oct 17</span>
               <div className="hero-stage">
                 <div className="window window--dark">
                   <div className="window__bar">
@@ -126,21 +126,23 @@ export default function Home() {
                     <span className="window__title">Assistant</span>
                   </div>
                   <div className="chat">
-                    <div className="msg you">Cancel my Northside Gym membership. Whatever it takes, up to $30.</div>
+                    <div className="msg you">
+                      Ask 24 Hour Fitness in San Diego if a membership can be cancelled by phone or only in writing. Up
+                      to $1.08.
+                    </div>
                     <div className="msg ai">
                       <span className="who">Assistant</span>
                       Here is the plan. I start with the cheapest step and stop as soon as it is done.
                       <ol>
-                        <li>AI call to Northside Gym, up to $0.54</li>
+                        <li>AI call to the Balboa club, up to $0.54</li>
                         <li>Follow-up AI call, up to $0.54</li>
-                        <li>Certified letter with return receipt, up to $15</li>
                       </ol>
-                      That is at most $16.08. I can add a person who calls for you (optional, up to $15). Anything a
-                      step does not use comes back to your wallet.
+                      That is at most $1.08. Anything a step does not use comes back to your wallet.
                     </div>
                     <div className="msg ai">
                       <span className="who">Assistant</span>
-                      The gym needs written notice, so I sent the certified letter. $0.60 came back to you.
+                      The club says you can cancel in person or online, and mailed cancellations aren&rsquo;t
+                      accepted. The call cost $0.54, and the other $0.54 is back in your wallet.
                     </div>
                   </div>
                 </div>
@@ -159,12 +161,12 @@ export default function Home() {
                       <span className="t-micro">Payment request</span>
                       <span className="chip chip--soft">x402</span>
                     </div>
-                    <div className="approval__amount">$16.08</div>
+                    <div className="approval__amount">$1.08</div>
                     <div className="t-micro">USDC on Base</div>
                     <ul>
                       <li>
                         <span>Pay to</span>
-                        <span>0x7a3f…c41e (example)</span>
+                        <span>0xd72f…b362</span>
                       </li>
                       <li>
                         <span>Endpoint</span>
@@ -185,14 +187,14 @@ export default function Home() {
               </div>
               <div className="float" style={{ left: "38%", bottom: "6%" }}>
                 <div className="inner">
-                  <span>Gym says: needs written notice</span>
+                  <span>Club: in person or online, not by mail</span>
                 </div>
               </div>
               <div className="float" style={{ right: "3%", bottom: "14%" }}>
                 <div className="inner">
                   <span className="dot" />
                   <span>
-                    <b>$0.60</b> back to you
+                    <b>$0.54</b> back to you
                   </span>
                 </div>
               </div>
