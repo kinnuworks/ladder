@@ -1,0 +1,33 @@
+{
+  "name": "ladder-web",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": "24.x",
+    "pnpm": "11.11.0"
+  },
+  "packageManager": "pnpm@11.11.0",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "check-core": "node scripts/check-core.mjs",
+    "test": "node scripts/check-core.mjs && vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "next": "16.3.8",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "viem": "2.38.6",
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "24.12.2",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "typescript": "5.9.3",
+    "vitest": "5.0.3"
+  }
+}

@@ -1,6 +1,12 @@
 {
-  "tool": "echo",
+  "tool": "ladder_plan",
   "arguments": {
-    "message": "hello paybox"
+    "owner": "0x000000000000000000000000000000000000dEaD",
+    "goal": "Cancel my gym membership and stop the monthly charge.",
+    "for_name": "Alex Example",
+    "business_name": "Example Fitness",
+    "business_phone": "+14155550100",
+    "steps": ["phone"],
+    "budget_usd": 2
   }
 }

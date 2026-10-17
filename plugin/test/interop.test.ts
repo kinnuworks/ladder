@@ -19,11 +19,12 @@ import {
   type Rung,
 } from "../src/core.ts";
 
+const runner = () => { const k = newSessionKey(); return { to: k.address, runnerKey: k.privateKey }; };
 const enabled = !!process.env.LADDER_INTEROP;
 const RPC = "http://127.0.0.1:8547";
 // anvil's first default account
 const DEPLOYER_KEY: Hex = "0xac0974bec39a17e36ba4a6b4d238ff944bacb478cbed5efcae784d7bf4f2ff80";
-const PHONE = getAddress("0xD219dB8179Bb9C1899eF87f39eebA9D1070c6801");
+const _PHONE = getAddress("0xD219dB8179Bb9C1899eF87f39eebA9D1070c6801");
 const MAIL = getAddress("0x3ea31de08708a6eb65f345719e6b1cdb72df0406");
 
 let anvil: ChildProcess | undefined;
@@ -88,8 +89,8 @@ test("core.ts and the deployed contracts agree end to end", { skip: !enabled }, 
   const session = newSessionKey();
   const owner = newSessionKey().address;
   const rungs: Rung[] = [
-    { rail: "phone", label: "AI call", to: PHONE, max: 540_000n, nonce: randomHex32(), salt: randomHex32() },
-    { rail: "mail", label: "Certified letter", to: MAIL, max: 14_400_000n, nonce: randomHex32(), salt: randomHex32() },
+    { rail: "phone", label: "AI call", ...runner(), max: 540_000n, nonce: randomHex32(), salt: randomHex32() },
+    { rail: "mail", label: "Certified letter", ...runner(), max: 14_400_000n, nonce: randomHex32(), salt: randomHex32() },
   ];
   const { root, proofs } = buildTree(rungs.map(rungLeaf));
   const block = await pub.getBlock();
@@ -118,6 +119,7 @@ test("core.ts and the deployed contracts agree end to end", { skip: !enabled }, 
     validBefore,
     sessionKey: session.privateKey,
   });
+  const PHONE = rungs[0]!.to;
   const before = await pub.readContract({ address: USDC, abi: usdcAbi, functionName: "balanceOf", args: [PHONE] });
   await pub.waitForTransactionReceipt({
     hash: await wallet.writeContract({

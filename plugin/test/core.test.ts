@@ -14,6 +14,7 @@ import {
   type Rung,
 } from "../src/core.ts";
 
+const runner = () => { const k = newSessionKey(); return { to: k.address, runnerKey: k.privateKey }; };
 const leaves = (n: number) => Array.from({ length: n }, () => randomHex32());
 
 test("every leaf proves against the root, for trees of 1 to 9 leaves", () => {
@@ -26,8 +27,8 @@ test("every leaf proves against the root, for trees of 1 to 9 leaves", () => {
 });
 
 const rungs = (): Rung[] => [
-  { rail: "phone", label: "AI call", to: getAddress("0xD219dB8179Bb9C1899eF87f39eebA9D1070c6801"), max: 540_000n, nonce: randomHex32(), salt: randomHex32() },
-  { rail: "human", label: "Human call", to: getAddress("0x4603366F72023572b139D19e354e9FA3A50c634B"), max: 15_000_000n, nonce: randomHex32(), salt: randomHex32() },
+  { rail: "phone", label: "AI call", ...runner(), max: 540_000n, nonce: randomHex32(), salt: randomHex32() },
+  { rail: "human", label: "Human call", ...runner(), max: 15_000_000n, nonce: randomHex32(), salt: randomHex32() },
 ];
 
 function key() {

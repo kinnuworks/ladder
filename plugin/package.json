@@ -1,6 +1,6 @@
 {
-  "name": "my-plugin",
-  "version": "0.1.0",
+  "name": "ladder",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "engines": {
@@ -13,7 +13,9 @@
     "build": "esbuild src/plugin.ts --bundle --platform=node --format=esm --target=node24 --minify --outfile=dist/plugin.mjs",
     "conformance": "node scripts/conformance.mjs",
     "test": "node scripts/test.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "unit": "tsx --test test/core.test.ts",
+    "interop": "LADDER_INTEROP=1 tsx --test test/interop.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/server": "2.0.0",
