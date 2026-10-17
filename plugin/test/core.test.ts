@@ -1,4 +1,4 @@
-import { test } from "node:test";
+import { test, describe } from "node:test";
 import assert from "node:assert/strict";
 import { getAddress, type Hex } from "viem";
 import {
@@ -66,4 +66,38 @@ test("signing refuses to exceed a rung's cap", async () => {
     signRungPayment({ errand: getAddress("0x4444444444444444444444444444444444444444"), rung: rs[0]!, proof: [] as Hex[], value: 540_001n, validBefore: 1n, sessionKey: s.privateKey }),
     /capped/,
   );
+});
+
+describe("seeded errand keys (v2)", () => {
+  const owner = "0x996b38feec91d67a7f48af3a8ffd4c1eb0a92736";
+  const brief = { goal: "Ask whether the membership can be cancelled by phone.", forName: "Alex Example", business: { name: "Example Fitness", timeZone: "America/Chicago", phone: "+13125550100" } };
+
+  test("decode rebuilds every key, nonce and salt from the seed and matches the errand", async () => {
+    const { makePlan } = await import("../src/plan.ts");
+    const p = makePlan({ owner, brief, include: ["phone"], hours: 72 });
+    const d = decodeErrandKey(p.key);
+    assert.equal(d.errand, p.errand);
+    assert.equal(d.key.v, 2);
+    assert.equal(d.rungs.length, 2);
+    assert.equal(d.rungs[0]!.to, p.rungs[0]!.runner);
+    assert.notEqual(d.rungs[0]!.runnerKey, d.rungs[1]!.runnerKey);
+    assert.notEqual(d.rungs[0]!.nonce, d.rungs[1]!.nonce);
+    assert.ok(p.key.length < 1300, `key is ${p.key.length} characters`);
+  });
+
+  test("a mistyped seed is caught instead of pointing at another errand", async () => {
+    const { makePlan } = await import("../src/plan.ts");
+    const p = makePlan({ owner, brief, include: ["phone"], hours: 72 });
+    const raw = JSON.parse(Buffer.from(p.key.slice(5), "base64url").toString());
+    raw.seed = raw.seed.slice(0, -1) + (raw.seed.endsWith("0") ? "1" : "0");
+    assert.throws(() => decodeErrandKey("ldr1_" + Buffer.from(JSON.stringify(raw)).toString("base64url")), /damaged/);
+  });
+
+  test("a raised step cap is caught", async () => {
+    const { makePlan } = await import("../src/plan.ts");
+    const p = makePlan({ owner, brief, include: ["phone"], hours: 72 });
+    const raw = JSON.parse(Buffer.from(p.key.slice(5), "base64url").toString());
+    raw.rungs[0][2] = "15000000";
+    assert.throws(() => decodeErrandKey("ldr1_" + Buffer.from(JSON.stringify(raw)).toString("base64url")), /damaged/);
+  });
 });

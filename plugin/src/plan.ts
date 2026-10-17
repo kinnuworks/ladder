@@ -1,6 +1,7 @@
 // Turns a request into committed rungs, terms and an errand key.
-import { getAddress, type Address } from "viem";
-import { buildTree, encodeErrandKey, newSessionKey, predictErrand, randomHex32, rungLeaf, type Brief, type Rung, type RailId } from "./core.js";
+import { getAddress, type Address, type Hex } from "viem";
+import { privateKeyToAccount } from "viem/accounts";
+import { buildTree, encodeSeededKey, keyFromSeed, predictErrand, randomHex32, rungLeaf, seededRung, type Brief, type Rung, type RailId } from "./core.js";
 import { FACTORY, IMPLEMENTATION } from "./config.js";
 import { RAILS } from "./rails.js";
 
@@ -25,12 +26,9 @@ export interface Plan {
 const usd = (atomic: bigint) => (Number(atomic) / 1e6).toFixed(2);
 
 /** The ladder for a brief: AI call, follow-up AI call, human caller, certified letter. */
-export function rungsFor(brief: Brief, include: RailId[]): Rung[] {
+export function rungsFor(brief: Brief, include: RailId[], seed: Hex = randomHex32()): Rung[] {
   const out: Rung[] = [];
-  const add = (rail: RailId, label: string) => {
-    const runner = newSessionKey();
-    out.push({ rail, label, to: runner.address, max: RAILS[rail].cap, nonce: randomHex32(), salt: randomHex32(), runnerKey: runner.privateKey });
-  };
+  const add = (rail: RailId, label: string) => out.push(seededRung(seed, out.length, rail, label, RAILS[rail].cap));
   if (include.includes("phone") && brief.business.phone) {
     add("phone", `AI call to ${brief.business.name}`);
     add("phone", `Follow-up AI call to ${brief.business.name}`);
@@ -43,11 +41,13 @@ export function rungsFor(brief: Brief, include: RailId[]): Rung[] {
 
 export function makePlan(input: { owner: string; brief: Brief; include: RailId[]; budgetUsd?: number; hours: number }): Plan {
   const owner = getAddress(input.owner);
-  const rungs = rungsFor(input.brief, input.include);
+  // One random seed; the session key and every step's key, nonce and salt are derived from it.
+  const seed = randomHex32();
+  const rungs = rungsFor(input.brief, input.include, seed);
   const { root } = buildTree(rungs.map(rungLeaf));
-  const session = newSessionKey();
+  const sessionSigner = privateKeyToAccount(keyFromSeed(seed, "session")).address;
   const expiry = Math.floor(Date.now() / 1000) + Math.round(input.hours * 3600);
-  const terms = { factory: FACTORY, implementation: IMPLEMENTATION, owner, sessionSigner: session.address, expiry, rungsRoot: root };
+  const terms = { factory: FACTORY, implementation: IMPLEMENTATION, owner, sessionSigner, expiry, rungsRoot: root };
   if (input.brief.business.timeZone) {
     try {
       new Intl.DateTimeFormat("en-US", { timeZone: input.brief.business.timeZone });
@@ -61,13 +61,13 @@ export function makePlan(input: { owner: string; brief: Brief; include: RailId[]
   if (budget < 1_000_000n) throw new Error("The budget must be at least $1.");
   if (budget < caps) throw new Error(`These steps can cost up to $${usd(caps)}; raise the budget to at least that, or drop a step.`);
   const errand = predictErrand(terms);
-  const key = encodeErrandKey({
-    v: 1,
-    terms,
-    sessionKey: session.privateKey,
-    rungs: rungs.map((r) => ({ ...r, max: r.max.toString() })),
+  const key = encodeSeededKey({
+    seed,
+    terms: { factory: FACTORY, implementation: IMPLEMENTATION, owner, expiry },
+    rungs: rungs.map((r) => [r.rail, r.label, r.max.toString()]),
     budget: budget.toString(),
     brief: input.brief,
+    errand: predictErrand(terms),
   });
   return {
     errand,

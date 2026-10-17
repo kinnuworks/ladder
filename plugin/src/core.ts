@@ -241,13 +241,65 @@ export function siweMessage(info: SignInInfo, address: Address): string {
 
 /** Everything the agent must hold to run the errand. Never sent to the Ladder backend. */
 export interface ErrandKey {
-  v: 1;
+  v: 1 | 2;
   terms: Terms;
   sessionKey: Hex;
   rungs: Array<Omit<Rung, "max"> & { max: string }>;
   /** Atomic USDC the owner funds. */
   budget?: string;
   brief?: Brief;
+  /** Version 2: the 32-byte secret every key, nonce and salt is derived from. */
+  seed?: Hex;
+}
+
+/** The compact form the agent carries: one seed instead of every key. Decodes to an ErrandKey. */
+interface SeededKey {
+  v: 2;
+  seed: Hex;
+  terms: { factory: Address; implementation: Address; owner: Address; expiry: number };
+  /** [rail, label, max] per step, in order. */
+  rungs: [RailId, string, string][];
+  budget?: string;
+  brief?: Brief;
+  /** The errand address these values produce, so a mistyped key is caught instead of pointing elsewhere. */
+  errand: Address;
+}
+
+const SECP256K1_N = 0xfffffffffffffffffffffffffffffffebaaedce6af48a03bbfd25e8cd0364141n;
+
+/** A value derived from the errand seed for one purpose, such as "session" or "runner:0". */
+export function fromSeed(seed: Hex, purpose: string): Hex {
+  return keccak256(concat([seed, toHex(`ladder:${purpose}`)]));
+}
+
+/** A private key derived from the seed; re-hashed in the (vanishingly rare) case it is out of range. */
+export function keyFromSeed(seed: Hex, purpose: string): Hex {
+  let k = fromSeed(seed, purpose);
+  while (BigInt(k) === 0n || BigInt(k) >= SECP256K1_N) k = keccak256(k);
+  return k;
+}
+
+/** Step i of an errand, entirely determined by the seed, its rail, label and cap. */
+export function seededRung(seed: Hex, i: number, rail: RailId, label: string, max: bigint): Rung {
+  const runnerKey = keyFromSeed(seed, `runner:${i}`);
+  return { rail, label, to: privateKeyToAccount(runnerKey).address, max, nonce: fromSeed(seed, `nonce:${i}`), salt: fromSeed(seed, `salt:${i}`), runnerKey };
+}
+
+/** Encode a version-2 key from its seed. Everything else is recomputed when it is decoded. */
+export function encodeSeededKey(k: Omit<SeededKey, "v">): string {
+  return "ldr1_" + Buffer.from(JSON.stringify({ v: 2, ...k })).toString("base64url");
+}
+
+function expandSeeded(k: SeededKey): ErrandKey {
+  const rungs = k.rungs.map(([rail, label, max], i) => seededRung(k.seed, i, rail, label, BigInt(max)));
+  const sessionKey = keyFromSeed(k.seed, "session");
+  const terms: Terms = {
+    ...k.terms,
+    sessionSigner: privateKeyToAccount(sessionKey).address,
+    rungsRoot: buildTree(rungs.map(rungLeaf)).root,
+  };
+  if (predictErrand(terms) !== getAddress(k.errand)) throw new Error("This errand key is damaged: it no longer produces its errand's address.");
+  return { v: 2, terms, sessionKey, rungs: rungs.map((r) => ({ ...r, max: r.max.toString() })), budget: k.budget, brief: k.brief, seed: k.seed };
 }
 
 /** What the errand is for. Stays in the agent's errand key; only the business name is sent to Ladder's server. */
@@ -277,8 +329,10 @@ export function encodeErrandKey(k: ErrandKey): string {
 
 export function decodeErrandKey(s: string): { key: ErrandKey; rungs: Rung[]; proofs: Hex[][]; errand: Address } {
   if (!s.startsWith("ldr1_")) throw new Error("That is not a Ladder errand key.");
-  const key = JSON.parse(Buffer.from(s.slice(5), "base64url").toString("utf8")) as ErrandKey;
-  if (key.v !== 1) throw new Error("Unsupported errand key version.");
+  const raw = JSON.parse(Buffer.from(s.slice(5), "base64url").toString("utf8")) as { v?: unknown; seed?: unknown };
+  if (raw.v !== 1 && raw.v !== 2) throw new Error("Unsupported errand key version.");
+  if (raw.v === 2 && !(typeof raw.seed === "string" && /^0x[0-9a-fA-F]{64}$/.test(raw.seed))) throw new Error("This errand key's seed is malformed.");
+  const key = raw.v === 2 ? expandSeeded(raw as SeededKey) : (raw as ErrandKey);
   const rungs: Rung[] = key.rungs.map((r) => ({ ...r, to: getAddress(r.to), max: BigInt(r.max) }));
   const { root, proofs } = buildTree(rungs.map(rungLeaf));
   if (root !== key.terms.rungsRoot) throw new Error("This errand key does not match its own rung commitment.");

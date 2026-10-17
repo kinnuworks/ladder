@@ -109,7 +109,7 @@ const SECRET = /ldr1_|(?:0x)?[0-9a-fA-F]{64}/;
 /** Pieces of this errand's real key material that must never leave in text: every private key, with and
  *  without 0x, and every 16-character slice of the encoded errand key. */
 export function secretPieces(key: ErrandKey, encoded?: string): string[] {
-  const hex = [key.sessionKey, ...key.rungs.map((r) => r.runnerKey)].flatMap((k) => [k.toLowerCase(), k.slice(2).toLowerCase()]);
+  const hex = [key.sessionKey, ...key.rungs.map((r) => r.runnerKey), ...(key.seed ? [key.seed] : [])].flatMap((k) => [k.toLowerCase(), k.slice(2).toLowerCase()]);
   const slices: string[] = [];
   if (encoded) for (let i = 0; i + 16 <= encoded.length; i += 4) slices.push(encoded.slice(i, i + 16));
   return [...hex, ...slices];
@@ -283,11 +283,19 @@ export async function runRung(
   assertNoSecrets("reason", d.reason, pieces);
   assertNoSecrets("letter", d.letter, pieces);
 
-  const [runnerBalance, released] = await Promise.all([usdcBalance(rung.to, dl), stepUsed(d.errand, rung.nonce, dl)]);
-
   if (rung.rail === "phone" || rung.rail === "human") {
     if (rung.rail === "phone") assertCallingHours(brief.business.timeZone, d.now);
     const { url, body, jobId } = stepBody(d, d.index, d.reason);
+    // Ask for the price while reading the chain, so the payment gets as much of the time limit as possible.
+    // The probe is free; on the release call its answer is simply not used.
+    const [runnerBalance, released, quoted] = await Promise.all([
+      usdcBalance(rung.to, dl),
+      stepUsed(d.errand, rung.nonce, dl),
+      probe(url, "POST", body, dl.left(3500)).then(
+        (c) => ({ ok: true as const, c }),
+        (e: unknown) => ({ ok: false as const, e }),
+      ),
+    ]);
     if (!released) {
       const tx = await releaseCap(d, d.index, dl);
       return {
@@ -299,7 +307,8 @@ export async function runRung(
       };
     }
     return returnOnRefusal(d, rung, dl, async () => {
-      const challenge = await probe(url, "POST", body, dl.left(3500));
+      if (!quoted.ok) throw quoted.e;
+      const challenge = quoted.c;
       if (BigInt(challenge.requirement.amount) > rung.max) {
         throw new RailRefused("OVER_STEP_CAP", `${RAILS[rung.rail].name} now asks $${(Number(challenge.requirement.amount) / 1e6).toFixed(2)}; this step is capped at $${(Number(rung.max) / 1e6).toFixed(2)}. Nothing was paid.`);
       }
@@ -323,6 +332,7 @@ export async function runRung(
   }
 
   // Certified letter.
+  const [runnerBalance, released] = await Promise.all([usdcBalance(rung.to, dl), stepUsed(d.errand, rung.nonce, dl)]);
   if (!d.letter) throw new RailRefused("NEEDS_LETTER", "Pass the full letter text for the certified-letter step.");
   if (!brief.business.address || !brief.sender || !brief.replyEmail) {
     throw new RailRefused("NEEDS_ADDRESSES", "The letter step needs the business's US address, the sender's US address and a reply email.");
