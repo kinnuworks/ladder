@@ -7,7 +7,7 @@ import { decodeErrandKey, signRefund, type RailId } from "./core.js";
 import { DEPLOYED, PUBLIC_URL } from "./config.js";
 import { makePlan } from "./plan.js";
 import { RailRefused } from "./x402.js";
-import { RAILS, finishErrand, runRung, readRung, stepUsed } from "./rails.js";
+import { Deadline, RAILS, finishErrand, runRung, readRung, stepUsed } from "./rails.js";
 
 const PROTOCOL_VERSION = "2026-07-28";
 
@@ -30,6 +30,14 @@ async function getJson(path: string, init?: RequestInit) {
   } finally {
     clearTimeout(t);
   }
+}
+
+/** The errand page, with the public plan (business name and each step's commitment) so the page can
+ *  check its labels against the on-chain root. Carries no goal, contact details or keys. */
+function pageLink(errand: string, business: string, key: string): string {
+  const { rungs } = decodeErrandKey(key);
+  const plan = { business, rungs: rungs.map((r) => ({ rail: r.rail, label: r.label, to: r.to, max: r.max.toString(), nonce: r.nonce, salt: r.salt })) };
+  return `${PUBLIC_URL}/e/${errand}?plan=${Buffer.from(JSON.stringify(plan)).toString("base64url")}`;
 }
 
 function createServer() {
@@ -108,7 +116,7 @@ function createServer() {
                 `Anything left goes back to ${getAddress(a.owner)}. Show this mandate to the user, then call ladder_fund with the errand key.`,
             },
           ],
-          structuredContent: { errand: p.errand, budget_usd: p.budgetUsd, expires_at: p.expiresAt, mandate, errand_key: p.key, page: `${PUBLIC_URL}/e/${p.errand}` },
+          structuredContent: { errand: p.errand, budget_usd: p.budgetUsd, expires_at: p.expiresAt, mandate, errand_key: p.key, page: pageLink(p.errand, a.business_name, p.key) },
         };
       } catch (e) {
         return refuse("BAD_PLAN", (e as Error).message);
@@ -190,12 +198,13 @@ function createServer() {
         const d = decodeErrandKey(errand_key);
         const rung = d.rungs[step - 1];
         if (!rung) return refuse("NO_SUCH_STEP", `This errand has ${d.rungs.length} steps.`);
+        const dl = new Deadline();
         if (step > 1 && !skip_reason) {
-          const earlier = await Promise.all(d.rungs.slice(0, step - 1).map((r) => stepUsed(d.errand, r.nonce)));
+          const earlier = await Promise.all(d.rungs.slice(0, step - 1).map((r) => stepUsed(d.errand, r.nonce, dl)));
           const unused = earlier.findIndex((u) => !u);
           if (unused !== -1) return refuse("STEP_ORDER", `Step ${unused + 1} has not run yet. Run it first, or give skip_reason.`);
         }
-        const out = await runRung({ ...d, index: step - 1, reason, letter, confirmLetter: confirm_letter_sha256 as Hex | undefined });
+        const out = await runRung({ ...d, index: step - 1, reason, letter, confirmLetter: confirm_letter_sha256 as Hex | undefined, dl, encodedKey: errand_key });
         const paid = (Number(out.paid.amount) / 1e6).toFixed(2);
         return {
           content: [{ type: "text", text: `Step ${step}, ${RAILS[rung.rail].name}: ${out.status}${out.paid.amount !== "0" ? `, paid $${paid}` : ""}. ${out.next}` }],

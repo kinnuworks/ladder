@@ -75,12 +75,23 @@ async function post(path: string, body: unknown, dl: Deadline) {
 
 // --- guards ------------------------------------------------------------------
 
-const SECRET = /ldr1_|0x[0-9a-fA-F]{64}/;
+const SECRET = /ldr1_|(?:0x)?[0-9a-fA-F]{64}/;
+
+/** Pieces of this errand's real key material that must never leave in text: every private key, with and
+ *  without 0x, and every 16-character slice of the encoded errand key. */
+export function secretPieces(key: ErrandKey, encoded?: string): string[] {
+  const hex = [key.sessionKey, ...key.rungs.map((r) => r.runnerKey)].flatMap((k) => [k.toLowerCase(), k.slice(2).toLowerCase()]);
+  const slices: string[] = [];
+  if (encoded) for (let i = 0; i + 16 <= encoded.length; i += 4) slices.push(encoded.slice(i, i + 16));
+  return [...hex, ...slices];
+}
 
 /** Text the agent writes that leaves for a third party must never carry the errand's keys. */
-export function assertNoSecrets(field: string, text: string | undefined) {
-  if (text && SECRET.test(text)) {
-    throw new RailRefused("SECRET_IN_OUTPUT", `The ${field} contains something that looks like an errand key or private key. Ladder never sends keys to anyone; remove it.`);
+export function assertNoSecrets(field: string, text: string | undefined, pieces: string[] = []) {
+  if (!text) return;
+  const lower = text.toLowerCase();
+  if (SECRET.test(text) || pieces.some((p) => (/^[0-9a-f]+$/.test(p) ? lower.includes(p) : text.includes(p)))) {
+    throw new RailRefused("SECRET_IN_OUTPUT", `The ${field} contains an errand key or a piece of one. Ladder never sends keys to anyone; remove it.`);
   }
 }
 
@@ -206,12 +217,15 @@ function stepBody(d: Decoded, i: number, reason: string) {
   };
 }
 
-export async function runRung(d: Decoded & { index: number; reason: string; letter?: string; confirmLetter?: Hex; now?: Date }): Promise<StepResult> {
-  const dl = new Deadline();
+export async function runRung(
+  d: Decoded & { index: number; reason: string; letter?: string; confirmLetter?: Hex; now?: Date; dl?: Deadline; encodedKey?: string },
+): Promise<StepResult> {
+  const dl = d.dl ?? new Deadline();
   const rung = d.rungs[d.index]!;
   const brief = d.key.brief!;
-  assertNoSecrets("reason", d.reason);
-  assertNoSecrets("letter", d.letter);
+  const pieces = secretPieces(d.key, d.encodedKey);
+  assertNoSecrets("reason", d.reason, pieces);
+  assertNoSecrets("letter", d.letter, pieces);
 
   const runnerBalance = await usdcBalance(rung.to, dl);
   const released = await stepUsed(d.errand, rung.nonce, dl);
@@ -230,6 +244,12 @@ export async function runRung(d: Decoded & { index: number; reason: string; lett
       };
     }
     const challenge = await probe(url, "POST", body, dl.left(3500));
+    if (runnerBalance < BigInt(challenge.requirement.amount)) {
+      throw new RailRefused(
+        "ALREADY_PAID_OR_CONFIRMING",
+        `This step's key holds $${(Number(runnerBalance) / 1e6).toFixed(2)}, less than the $${(Number(challenge.requirement.amount) / 1e6).toFixed(2)} this costs. Either the step was already paid (check it with ladder_check using its job id, or see the step key ${rung.to} on the errand page), or its release is still confirming: wait a few seconds and run it again. Nothing new was paid.`,
+      );
+    }
     const res = await payAsRunner({ url, method: "POST", body, challenge, expect: { payTo: RAILS[rung.rail].payTo, maxAmount: runnerBalance }, runnerKey: rung.runnerKey, timeoutMs: dl.left(8000) });
     if (res.status >= 400) throw new RailRefused(`SERVICE_${res.status}`, `${RAILS[rung.rail].name} refused the request and did not charge: ${JSON.stringify(res.body).slice(0, 300)}`);
     return {
@@ -288,6 +308,9 @@ export async function runRung(d: Decoded & { index: number; reason: string; lett
   const status = (await (await fetchWithTimeout(`${POSTALFORM}/${orderId}`, { headers: { accept: "application/json" } }, dl.left(2500))).json()) as any;
   const orderPayTo = status?.x402?.pay_to ? getAddress(status.x402.pay_to) : undefined;
   if (!orderPayTo || getAddress(challenge.requirement.payTo) !== orderPayTo) throw new RailRefused("PAYEE_MISMATCH", "PostalForm's payment address does not match the order's own status.");
+  if (runnerBalance < BigInt(challenge.requirement.amount)) {
+    throw new RailRefused("ALREADY_PAID_OR_CONFIRMING", `This step's key holds less than the letter costs. Either the letter was already paid (check it with ladder_check and job id ${orderId}), or its release is still confirming: wait a few seconds and run it again. Nothing new was paid.`);
+  }
   const res = await payAsRunner({ url: POSTALFORM, method: "POST", body: order, challenge, expect: { payTo: orderPayTo, maxAmount: runnerBalance }, runnerKey: rung.runnerKey, timeoutMs: dl.left(6000) });
   if (res.status >= 400) throw new RailRefused(`SERVICE_${res.status}`, `PostalForm refused the order: ${JSON.stringify(res.body).slice(0, 300)}`);
   return {

@@ -45,6 +45,12 @@ Each claim is tagged with how you can check it.
 - **Why x402 for funding?** It's one gasless approval in PayBox. The plugin checks the funding endpoint's payee before proposing, and the address is a pure function of the terms.
 - **Why a relayer?** Steps and refunds happen without the user being present, and plugins can't hold state or keys. The relayer only ever submits transactions the errand contract or a step key already authorised.
 
+## What the plugin signs
+
+PayBox's guide says plugins propose and PayBox signs. Ladder keeps to that for the user's wallet: the only payment from the user's PayBox wallet is the funding, and PayBox signs it after the user approves. After that, the plugin signs with keys it made for this errand only: the session key releases a step's cap from the errand, and each step key pays one service. Those keys can only ever move money the user already put into the errand, within the caps committed on-chain, and never touch the PayBox wallet.
+
+The letter preview and its hash go to the agent, which must show them to the user. Ladder can't see the user's screen, so that step relies on the agent; the hash makes sure the letter that gets mailed is the one that was shown.
+
 ## Compliance notes
 
 - **No custody.** Ladder never holds user funds. The relayer can only move money to committed step keys or to the owner.
@@ -53,4 +59,4 @@ Each claim is tagged with how you can check it.
 
 ## Build log
 
-Everything in this repository was written between October 16 08:00 and October 17 20:00 EDT. The commit history is the log.
+Research and unpaid rail probes ran on the morning of October 17 (dated in docs/RAILS.md). All code was written and committed on the afternoon of October 17 EDT, inside the October 16 08:00 to October 17 20:00 window. The commit history is the log.

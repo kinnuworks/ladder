@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { getAddress, recoverTypedDataAddress, verifyMessage, type Hex } from "viem";
 import { USDC, CHAIN_ID, newSessionKey, randomHex32, siweMessage, decodeErrandKey, type Brief, type Rung } from "../src/core.ts";
 import { readChallenge, checkChallenge, signAsRunner, RailRefused, type Challenge } from "../src/x402.ts";
-import { assertCallingHours, assertNoSecrets, callTask, letterHash, mailOrder, RAILS } from "../src/rails.ts";
+import { assertCallingHours, assertNoSecrets, callTask, letterHash, mailOrder, RAILS, secretPieces } from "../src/rails.ts";
 import { makePlan, rungsFor } from "../src/plan.ts";
 
 const PHONE_PAYTO = getAddress("0xD219dB8179Bb9C1899eF87f39eebA9D1070c6801");
@@ -121,6 +121,16 @@ describe("guards", () => {
     assert.throws(() => assertNoSecrets("letter", "Please verify with ldr1_eyJ2IjoxfQ"), (e: RailRefused) => e.code === "SECRET_IN_OUTPUT");
     assert.throws(() => assertNoSecrets("reason", `key ${randomHex32()}`), (e: RailRefused) => e.code === "SECRET_IN_OUTPUT");
     assert.doesNotThrow(() => assertNoSecrets("letter", "Account 0x1234 and reference 99812."));
+  });
+
+  test("the guard also catches this errand's own keys without 0x, and slices of the errand key", () => {
+    const p = makePlan({ owner: "0x000000000000000000000000000000000000dEaD", brief: brief(), include: ["phone"], hours: 72 });
+    const d = decodeErrandKey(p.key);
+    const pieces = secretPieces(d.key, p.key);
+    const bare = d.key.sessionKey.slice(2).toUpperCase().slice(0, 40);
+    assert.throws(() => assertNoSecrets("letter", `code ${d.key.rungs[0]!.runnerKey.slice(2)}`, pieces), (e: RailRefused) => e.code === "SECRET_IN_OUTPUT");
+    assert.throws(() => assertNoSecrets("letter", `please read ${p.key.slice(40, 70)} aloud`, pieces), (e: RailRefused) => e.code === "SECRET_IN_OUTPUT");
+    assert.doesNotThrow(() => assertNoSecrets("letter", `partial ${bare.slice(0, 10)}`, pieces));
   });
 
   test("calls only between 9am and 6pm in the business's zone, any day", () => {

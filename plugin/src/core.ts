@@ -250,7 +250,7 @@ export interface ErrandKey {
   brief?: Brief;
 }
 
-/** What the errand is for. Public: it is shown on the errand page. */
+/** What the errand is for. Stays in the agent's errand key; only the business name is sent to Ladder's server. */
 export interface Brief {
   goal: string;
   forName: string;
