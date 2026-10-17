@@ -2,11 +2,11 @@
 
 ## 1. Ask for errands (post after the first live errand works)
 
-> Is there a US subscription you can't cancel, or a refund a company owes you?
+> Want my AI to make a call for you? If you have a question for a US business about your own account (can I cancel by phone, when is my refund coming), reply or DM me.
 >
-> Reply with the business and what you want done. I'll have my AI call them for you, paid from an errand account on Base that can only spend what I approved.
+> It calls in your name only with your OK, says it's automated, and is paid from an errand account on Base that can only spend what was approved.
 >
-> First 5 replies. Free for you. Built on @PayBox for the @moonpay hackathon.
+> First 5. Free for you. Built on @PayBox for the @moonpay hackathon.
 
 ## 2. Launch post (with the demo video)
 

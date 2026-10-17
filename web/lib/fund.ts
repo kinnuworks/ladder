@@ -35,6 +35,8 @@ export function checkFundRequest(
 
   const issues = planRungIssues(plan);
   if (issues.length) return { ok: false, status: 400, message: issues[0]! };
+  const caps = parsed.data.plan.rungs.reduce((t, r) => t + BigInt(r.max), 0n);
+  if (budget < caps) return { ok: false, status: 400, message: "The budget is below the total of the step caps, so a later step could not be released." };
 
   const errand = predictErrand(terms);
   if (plan.errand && plan.errand !== errand) return { ok: false, status: 400, message: "plan.errand does not match the terms." };

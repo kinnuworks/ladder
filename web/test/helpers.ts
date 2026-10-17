@@ -40,7 +40,7 @@ export function fixture(now = Math.floor(Date.now() / 1000)) {
   };
   const body = {
     terms: { owner: terms.owner, sessionSigner: terms.sessionSigner, expiry: terms.expiry, rungsRoot: terms.rungsRoot },
-    budget: "30000000",
+    budget: "30540000",
     plan,
   };
   return { terms, errand, plan, body, now };

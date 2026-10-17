@@ -40,6 +40,7 @@ describe("funding policy", () => {
 
   it("rejects budgets over 100 USDC", () => reject((b) => (b.budget = "100000001"), /100 USDC/));
   it("rejects budgets under 1 USDC", () => reject((b) => (b.budget = "999999"), /under 1 USDC/));
+  it("rejects a budget below the total of the step caps", () => reject((b) => (b.budget = "30539999"), /step caps/));
   it("rejects a foreign factory", () => reject((b) => (b.terms.factory = other.address), /factory/));
   it("rejects an unknown rail", () => reject((b) => (b.plan.rungs[0].rail = "fax"), /rail/));
   it("rejects a cap above the rail cap", () => {
@@ -74,10 +75,10 @@ describe("POST /api/fund", () => {
     expect(res.status).toBe(402);
     const v2 = unb64(res.headers.get(HEADER_REQUIRED)!);
     expect(v2.x402Version).toBe(2);
-    expect(v2.accepts[0]).toMatchObject({ payTo: errand, amount: "30000000", network: "eip155:8453" });
+    expect(v2.accepts[0]).toMatchObject({ payTo: errand, amount: "30540000", network: "eip155:8453" });
     expect(v2.resource.url).toBe("https://ladder.test/api/fund");
     const v1 = await res.json();
-    expect(v1.accepts[0]).toMatchObject({ payTo: errand, maxAmountRequired: "30000000", network: "base" });
+    expect(v1.accepts[0]).toMatchObject({ payTo: errand, maxAmountRequired: "30540000", network: "base" });
   });
 
   it("answers 400 to a bad body", async () => {
@@ -91,7 +92,7 @@ describe("POST /api/fund", () => {
     const { authorization, signature } = await signAuthorization(key, {
       from: owner.address,
       to: errand,
-      value: "30000000",
+      value: "30540000",
       validBefore: String(now + 300),
       ...over,
     });

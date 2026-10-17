@@ -1,6 +1,6 @@
 # Ladder
 
-Tell your AI: "Get my gym membership cancelled, up to $16." You approve once in PayBox. Your AI calls the gym. If the gym won't do it by phone, it calls again. If they insist on writing, it drafts a certified letter for you to approve and mails it with a return receipt. Whatever it doesn't spend comes back to you.
+Tell your AI: "Get my gym membership cancelled, up to $17." You approve once in PayBox. Your AI calls the gym. If the gym won't do it by phone, it calls again. If they insist on writing, it drafts a certified letter for you to approve and mails it with a return receipt. Whatever it doesn't spend comes back to you.
 
 The one approval funds an errand account on Base. The account can send each step's cap only to that step's one-time key, once, before an expiry; the plugin checks the service's address and price before that key pays. Everything else the account holds can only go back to your wallet. The contract enforces the caps, the one-time rule, the expiry and the refund; the agent decides when to climb.
 
@@ -12,7 +12,7 @@ The one approval funds an errand account on Base. The account can send each step
 
 Chat assistants can't finish errands that end in the real world. They can't place a phone call, hire someone to make one, or mail a legal letter, and when they can pay for something, they pay one thing at a time with an approval each time. PayBox's plugin rules make that explicit: a plugin proposes one payment, the user approves it, and the plugin is gone.
 
-Cancelling a subscription, chasing a refund, or getting a deposit back often takes several attempts through different channels. Ladder lets you approve the whole plan once, with every payee and every limit visible, and makes the chain hold the AI to it.
+Cancelling a subscription, chasing a refund, or getting a deposit back often takes several attempts through different channels. Ladder lets you approve the whole plan once: the agent shows every step and its cap in the chat, PayBox shows the total you are approving, and the chain holds the agent to the caps.
 
 ## How it works
 
@@ -56,7 +56,15 @@ US phone numbers and US addresses only, because that is what these services cove
 
 ## Built for the PayBox hackathon
 
-PayBox Hackathon, Chapter 1 (MoonPay), October 16 to 17, 2026. The contract and testing setup follows the author's earlier project [Stepwell](https://github.com/kinnuworks/stepwell); no code was copied from it. Research and rail probes happened on October 17 (see the dated notes in [docs/RAILS.md](docs/RAILS.md)), and all code was written and committed that afternoon, inside the hackathon window.
+PayBox Hackathon, Chapter 1 (MoonPay), October 16 to 17, 2026. The contract and testing setup follows the author's earlier project [Stepwell](https://github.com/kinnuworks/stepwell); no code was copied from it. Research and rail probes happened on October 17 (see the dated notes in [docs/RAILS.md](docs/RAILS.md)), and the code was built that afternoon in a local tree and committed in logical batches, inside the hackathon window. Commit times are commit times, not edit times.
+
+## Install
+
+Ladder is a PayBox plugin. While it awaits PayBox's review it is installable only from its author's account; once approved it appears in the PayBox plugin marketplace.
+
+To run your own copy: build `plugin/` (below), upload `plugin/dist/plugin.mjs` in the [PayBox developer portal](https://developer.paybox.sh), and allow these network hosts: `ladder-errands.vercel.app`, `stablephone.dev`, `api.mosbie.com`, `postalform.com`, `mainnet.base.org`. Then enable it under Plugins in the PayBox app and ask your agent to plan an errand.
+
+Contracts on Base: ErrandFactory [`0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c`](https://basescan.org/address/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c), Errand implementation [`0xc580544b22560C97f360d3e40Fb48464D85E7c06`](https://basescan.org/address/0xc580544b22560C97f360d3e40Fb48464D85E7c06), both verified on [Sourcify](https://repo.sourcify.dev/8453/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c).
 
 ## Run it
 
