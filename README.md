@@ -1,5 +1,7 @@
 # Ladder
 
+**Your AI can finally make the call. You set the budget.**
+
 Tell your AI: "Get my gym membership cancelled, up to $17." You approve once in PayBox. Your AI calls the gym. If the gym won't do it by phone, it calls again. If they insist on writing, it drafts a certified letter for you to approve and mails it with a return receipt. Whatever it doesn't spend comes back to you.
 
 The one approval funds an errand account on Base. The account can send each step's cap only to that step's one-time key, once, before an expiry; the plugin checks the service's address and price before that key pays. Everything else the account holds can only go back to your wallet. The contract enforces the caps, the one-time rule, the expiry and the refund; the agent decides when to climb.

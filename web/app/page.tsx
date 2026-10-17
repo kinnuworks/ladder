@@ -92,11 +92,11 @@ export default function Home() {
             Built for PayBox
           </span>
           <h1>
-            Your AI makes the call. You approve <em className="t-serif">once</em>.
+            Your AI can <em className="t-serif">finally</em> make the call. You set the budget.
           </h1>
           <p className="lead">
-            Tell your AI what you need from a business and the most it may spend. It calls them, calls again if it has
-            to, and mails a certified letter if they insist on writing. What it doesn't spend comes back to you.
+            It calls the business, follows up, and mails a certified letter if they insist on writing. You approve one
+            budget in PayBox, each step is capped on Base, and what it doesn&rsquo;t spend comes back to you.
           </p>
           <div className="cta-row">
             <a className="btn btn-candy btn-lg" href={add}>
@@ -107,8 +107,8 @@ export default function Home() {
             </Link>
           </div>
           <div className="trust">
-            <span>One approval</span>
-            <span>Caps enforced on Base</span>
+            <span>Live on Base: one real call, $0.54</span>
+            <span>Caps enforced on-chain</span>
             <span>Unspent money back to you</span>
           </div>
 
