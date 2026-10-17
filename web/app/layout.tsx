@@ -6,6 +6,7 @@ import "./foundation.css";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(process.env.PUBLIC_URL || "https://ladder-errands.vercel.app"),
   title: { default: "Ladder", template: "%s · Ladder" },
   description:
     "Ladder is a PayBox plugin. One approval funds an errand account on Base that can only send each step's cap to that step's one-time key, once, before the expiry. What is left comes back to you.",
