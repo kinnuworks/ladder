@@ -19,13 +19,14 @@ export function checkFundRequest(
 ): FundCheck {
   const parsed = fundBodySchema.safeParse(body);
   if (!parsed.success) return { ok: false, status: 400, message: firstIssue(parsed.error) };
-  const { terms, plan } = parsed.data as FundBody;
+  const { terms: input, plan } = parsed.data as FundBody;
   const budget = BigInt(parsed.data.budget);
 
-  if (terms.factory !== cfg.factory) return { ok: false, status: 400, message: "terms.factory is not the Ladder factory." };
-  if (terms.implementation !== cfg.implementation) {
+  if (input.factory && input.factory !== cfg.factory) return { ok: false, status: 400, message: "terms.factory is not the Ladder factory." };
+  if (input.implementation && input.implementation !== cfg.implementation) {
     return { ok: false, status: 400, message: "terms.implementation is not the Ladder errand implementation." };
   }
+  const terms: Terms = { ...input, factory: cfg.factory, implementation: cfg.implementation };
   if (terms.expiry <= nowSeconds + MIN_EXPIRY_SECONDS) return { ok: false, status: 400, message: "The errand expiry is in the past or too close." };
   if (terms.expiry > nowSeconds + MAX_EXPIRY_SECONDS) return { ok: false, status: 400, message: "The errand expiry is more than 30 days out." };
   if (budget > MAX_BUDGET) return { ok: false, status: 400, message: "The budget is over 100 USDC." };

@@ -38,10 +38,13 @@ export type RailId = "phone" | "human" | "mail";
 export interface Rung {
   rail: RailId;
   label: string;
+  /** The step's one-time runner: the only address this rung can pay. */
   to: Address;
   max: bigint;
   nonce: Hex;
   salt: Hex;
+  /** The runner's private key. Secret; kept only in the agent's errand key. */
+  runnerKey: Hex;
 }
 
 export interface Terms {
@@ -55,7 +58,7 @@ export interface Terms {
 
 // --- rung tree -------------------------------------------------------------
 
-export function rungLeaf(r: Pick<Rung, "nonce" | "to" | "max" | "salt">): Hex {
+export function rungLeaf(r: { nonce: Hex; to: Address; max: bigint; salt: Hex }): Hex {
   return keccak256(
     keccak256(encodeAbiParameters(parseAbiParameters("bytes32, address, uint256, bytes32"), [r.nonce, r.to, r.max, r.salt])),
   );
@@ -205,9 +208,7 @@ export async function signRefund(errand: Address, sessionKey: Hex): Promise<Hex>
   return signRaw(digest, sessionKey);
 }
 
-// --- sign-in (SIWX / EIP-4361), so services show the errand its own results --
-
-export const SIGN_IN_TAG: Hex = keccak256(toHex("LadderSignIn"));
+// --- sign-in (SIWX / EIP-4361), signed by a step's runner key -------------
 
 export interface SignInInfo {
   domain: string;
@@ -236,14 +237,6 @@ export function siweMessage(info: SignInInfo, address: Address): string {
   return head + statement + fields.join("\n");
 }
 
-/** The errand's ERC-1271 signature over a sign-in message. */
-export async function signSignIn(message: string, sessionKey: Hex): Promise<Hex> {
-  const bytes = toHex(message);
-  const digest = keccak256(concat([toHex(`\x19Ethereum Signed Message:\n${(bytes.length - 2) / 2}`), bytes]));
-  const sessionSig = await signRaw(digest, sessionKey);
-  return encodeAbiParameters(parseAbiParameters("bytes32, bytes, bytes"), [SIGN_IN_TAG, bytes, sessionSig]);
-}
-
 // --- the errand key the agent keeps --------------------------------------
 
 /** Everything the agent must hold to run the errand. Never sent to the Ladder backend. */
@@ -269,6 +262,11 @@ export interface Brief {
   };
   accountRef?: string;
   callbackPhone?: string;
+  /** Where the human caller's report and the letter's return receipt are emailed. */
+  replyEmail?: string;
+  /** The user's US return address, printed on the certified letter. */
+  sender?: { line1: string; line2?: string; city: string; state: string; zip: string };
+  letterTitle?: string;
 }
 
 export function encodeErrandKey(k: ErrandKey): string {
@@ -284,6 +282,9 @@ export function decodeErrandKey(s: string): { key: ErrandKey; rungs: Rung[]; pro
   if (root !== key.terms.rungsRoot) throw new Error("This errand key does not match its own rung commitment.");
   if (privateKeyToAccount(key.sessionKey).address !== getAddress(key.terms.sessionSigner)) {
     throw new Error("This errand key's session key does not match its signer.");
+  }
+  for (const r of rungs) {
+    if (privateKeyToAccount(r.runnerKey).address !== r.to) throw new Error("A step's runner key does not match its committed runner.");
   }
   return { key, rungs, proofs, errand: predictErrand(key.terms) };
 }

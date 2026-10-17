@@ -3,6 +3,8 @@
 import {
   type Address,
   type Hex,
+  type Log,
+  decodeEventLog,
   getAddress,
   parseSignature,
   recoverAddress,
@@ -39,7 +41,7 @@ const transferTypes = {
   ],
 } as const;
 
-function typedAuthorization(a: ParsedAuthorization) {
+export function typedAuthorization(a: ParsedAuthorization) {
   return {
     domain: { name: "USD Coin", version: "2", chainId: CHAIN_ID, verifyingContract: USDC },
     types: transferTypes,
@@ -95,16 +97,17 @@ async function sendTransferWithAuthorization(a: ParsedAuthorization, signature: 
   } catch (err) {
     throw new RelayError(`USDC would reject this transfer: ${short(err)}`, 422, "invalid_transaction_state");
   }
-  return sendAndWait(request);
+  const { tx, blockNumber } = await sendAndWait(request);
+  return { tx, blockNumber };
 }
 
-async function sendAndWait(request: unknown): Promise<{ tx: Hex; blockNumber: bigint }> {
+async function sendAndWait(request: unknown): Promise<{ tx: Hex; blockNumber: bigint; logs: Log[] }> {
   const pub = publicClient();
   const wallet = relayer();
   const tx = await wallet.writeContract(request as never);
   const receipt = await pub.waitForTransactionReceipt({ hash: tx, timeout: RECEIPT_TIMEOUT_MS });
   if (receipt.status !== "success") throw new RelayError(`Transaction ${tx} reverted.`, 502, "unexpected_settle_error");
-  return { tx, blockNumber: receipt.blockNumber };
+  return { tx, blockNumber: receipt.blockNumber, logs: receipt.logs };
 }
 
 function short(err: unknown): string {
@@ -201,5 +204,16 @@ export async function relayRefund(input: { errand: Address; sessionSig: Hex }) {
     functionName: "refundWithSig",
     args: [input.sessionSig],
   });
-  return sendAndWait(request);
+  const sent = await sendAndWait(request);
+  let refunded = 0n;
+  for (const log of sent.logs) {
+    if (getAddress(log.address) !== input.errand) continue;
+    try {
+      const ev = decodeEventLog({ abi: errandAbi, data: log.data, topics: log.topics });
+      if (ev.eventName === "Refunded") refunded = ev.args.amount;
+    } catch {
+      // not a Refunded log
+    }
+  }
+  return { tx: sent.tx, blockNumber: sent.blockNumber, refunded };
 }

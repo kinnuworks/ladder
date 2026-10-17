@@ -18,16 +18,20 @@ export const hexBytes = z
   .transform((s) => s as Hex);
 export const uintString = z.string().regex(/^(0|[1-9][0-9]{0,77})$/, "Expected a non-negative integer string.");
 
-export const termsSchema = z
+/** Terms as sent by the plugin. `factory` and `implementation` may be left out; the server fills them in. */
+export const termsInputSchema = z
   .object({
-    factory: address,
-    implementation: address,
+    factory: address.optional(),
+    implementation: address.optional(),
     owner: address,
     sessionSigner: address,
-    expiry: z.number().int().positive().max(2 ** 63),
+    expiry: z.number().int().positive().max(2 ** 53),
     rungsRoot: bytes32,
   })
-  .strict() satisfies z.ZodType<Terms, unknown>;
+  .strict();
+
+/** Complete terms, as pasted on /verify. */
+export const termsSchema = termsInputSchema.required() satisfies z.ZodType<Terms, unknown>;
 
 export const planRungSchema = z.object({
   rail: z.enum(RAIL_IDS as [string, ...string[]]),
@@ -37,24 +41,37 @@ export const planRungSchema = z.object({
   max: uintString,
 });
 
-export const planSchema = z.object({
-  v: z.literal(1).optional(),
-  goal: z.string().max(500),
-  business: z.string().max(200).optional(),
-  errand: address.optional(),
-  rungs: z.array(planRungSchema).min(1).max(16),
-});
+/**
+ * The public part of a plan. The plugin sends `{ brief, rungs }`; only the goal and the business
+ * name are kept from the brief. Unknown fields (contact details, return address) are dropped.
+ */
+export const planSchema = z
+  .object({
+    brief: z
+      .object({ goal: z.string().max(500).optional(), business: z.object({ name: z.string().max(200).optional() }).optional() })
+      .optional(),
+    goal: z.string().max(500).optional(),
+    business: z.string().max(200).optional(),
+    errand: address.optional(),
+    rungs: z.array(planRungSchema).min(1).max(16),
+  })
+  .transform((p) => ({
+    goal: p.goal ?? p.brief?.goal ?? null,
+    business: p.business ?? p.brief?.business?.name ?? null,
+    ...(p.errand ? { errand: p.errand } : {}),
+    rungs: p.rungs,
+  }));
 
-export type Plan = z.infer<typeof planSchema>;
+export type Plan = z.output<typeof planSchema>;
 export type PlanRung = Plan["rungs"][number];
 
 export const fundBodySchema = z.object({
-  terms: termsSchema,
+  terms: termsInputSchema,
   budget: z.string().regex(/^[1-9][0-9]{0,19}$/, "Budget is atomic USDC, a positive integer string."),
   plan: planSchema,
 });
 
-export type FundBody = z.infer<typeof fundBodySchema>;
+export type FundBody = z.output<typeof fundBodySchema>;
 
 export const authorizationSchema = z.object({
   from: address,
@@ -89,8 +106,15 @@ export function decodePlanParam(value: string | undefined | null): { plan: Plan 
   }
 }
 
+/** The public plan for a `?plan=` link: goal, business name and the rungs. */
 export function encodePlanParam(plan: Plan): string {
-  return Buffer.from(JSON.stringify(plan)).toString("base64url");
+  const pub = {
+    ...(plan.goal ? { goal: plan.goal } : {}),
+    ...(plan.business ? { business: plan.business } : {}),
+    ...(plan.errand ? { errand: plan.errand } : {}),
+    rungs: plan.rungs,
+  };
+  return Buffer.from(JSON.stringify(pub)).toString("base64url");
 }
 
 /** Problems with a plan's rungs against the rail caps. Empty when the plan is acceptable. */
