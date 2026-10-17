@@ -74,6 +74,26 @@ export default async function ErrandPage({ params, searchParams }: Props) {
     );
   }
 
+  if (!v.deployed && !v.plan) {
+    return (
+      <main className="page app">
+        <div className="container">
+          <h1>No Ladder errand here.</h1>
+          <p className="mono" style={{ marginTop: 12 }}>
+            <Addr a={v.address} full />
+          </p>
+          <p className="notice">
+            No Ladder errand has been opened at this address. If you planned one, open its page from the link your agent
+            gave you, which carries the plan.{" "}
+            <Link className="link" href="/verify">
+              Check an errand address
+            </Link>
+          </p>
+        </div>
+      </main>
+    );
+  }
+
   const statusClass = v.status === "open" ? "is-open" : v.status === "closed" ? "is-closed" : "";
   return (
     <main className="page app">
@@ -125,12 +145,6 @@ export default async function ErrandPage({ params, searchParams }: Props) {
           <p className="notice">
             No errand contract is deployed at this address yet. The relayer opens it in the same request that settles
             its funding.
-          </p>
-        )}
-        {v.fundedButNotOpened && !v.plan && (
-          <p className="notice">
-            No Ladder errand has been opened at this address. If you planned an errand here, open its page from the
-            link your agent gave you, which carries the plan.
           </p>
         )}
         {v.fundedButNotOpened && v.plan && (

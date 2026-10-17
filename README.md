@@ -90,6 +90,8 @@ cd plugin && pnpm run interop
 - The contracts are not audited. The plugin caps a budget at $100.
 - The errand key in the conversation holds the errand's private keys. Anyone who gets it can spend what the errand still holds, up to the approved budget and never from the PayBox wallet. Ladder refuses to put it in letters or call scripts and labels everything a business says as untrusted. The owner can always pull the errand's balance back with `ladder_refund`, which needs no key.
 - The agent is told to ask before moving up to the letter and to show the letter first. Ladder can't see the user's screen, so that part relies on the agent.
+- If StablePhone takes the payment but the reply is cut off by PayBox's 10-second limit, the call id can be lost, and only the paying key can read a transcript. The payment still shows on the errand page and is never made twice.
+- Money already on a step key after a timeout or a server error stays there until `ladder_finish` returns it, which needs the errand key. `ladder_refund` and the expiry refund only reach the errand's own balance.
 - Ladder checks calling hours in code. That the AI caller stops when asked is an instruction, not a guarantee.
 
 ## Licence

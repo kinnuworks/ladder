@@ -38,8 +38,8 @@ const FAQ = [
     a: "PostalForm prints the letter and sends it by USPS Certified Mail with an electronic return receipt, for about $14.40. The step is capped at $15. Delivery takes a few days, and the tracking number shows up once it is mailed.",
   },
   {
-    q: "How do I hear what the person said on the call?",
-    a: "The person call is optional and costs $15. If you add it, Mosbie emails the result to the address you give the agent when it plans the errand.",
+    q: "How do I find out what the business said?",
+    a: "Ask your agent. After each AI call it reads back StablePhone's summary, the full transcript and a link to the recording, and tells you what it plans next. If you add the optional $15 person call, Mosbie emails that report to the address you give the agent.",
   },
   {
     q: "Who pays the gas?",
