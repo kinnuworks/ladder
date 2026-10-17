@@ -203,7 +203,50 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section section--alt after-bleed" id="how">
+      <section className="section after-bleed" id="real-call">
+        <div className="container">
+          <div className="section-head">
+            <span className="eyebrow">
+              <span className="dot" />
+              The real call · October 17
+            </span>
+            <h2>What the gym said.</h2>
+            <p className="lead">
+              One approval of $1.08 in PayBox. Ladder&rsquo;s AI caller rang 24 Hour Fitness in San Diego, a staff
+              member picked up, and the call cost $0.54. The unused $0.54 went back on its own.
+            </p>
+          </div>
+          <div className="card transcript reveal">
+            {(
+              [
+                ["Caller", "Hi, I'm calling on behalf of Dhiraj Kavuri. Please note this call is recorded."],
+                ["Club", "Please wait while I transfer your call."],
+                ["Caller", "I'm calling to ask how to cancel a 24 Hour Fitness membership. Does it need to be done in writing, and if so, what address should I use?"],
+                ["Club", "In order for you to cancel a membership, you either need to go and visit a club or do it online. Those are the only two ways of canceling."],
+                ["Caller", "Is there a postal address where I can send written notice instead?"],
+                ["Club", "Unfortunately, now you have to come in to a club to cancel."],
+                ["Caller", "So to confirm, written cancellation by mail is not an option. I must either visit a club in person or cancel online. Is that correct?"],
+                ["Club", "Correct."],
+              ] as const
+            ).map(([who, line], i) => (
+              <p key={i} className={who === "Club" ? "line club" : "line"}>
+                <span className="who">{who === "Club" ? "Club staff" : "AI caller"}</span>
+                {line}
+              </p>
+            ))}
+            <p className="t-micro" style={{ marginTop: 14 }}>
+              Excerpt from StablePhone&rsquo;s transcript, lightly trimmed.{" "}
+              {example && (
+                <Link className="link" href={example}>
+                  See every payment on the errand page
+                </Link>
+              )}
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="section section--alt" id="how">
         <div className="container">
           <div className="section-head">
             <span className="eyebrow">
