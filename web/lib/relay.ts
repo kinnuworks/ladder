@@ -127,6 +127,11 @@ export async function settleFunding(input: {
   const { terms, errand, budget, authorization: a, signature } = input;
   const pub = publicClient();
 
+  // Never move money toward an errand that could not be opened afterwards.
+  if (!(await hasCode(terms.factory))) {
+    throw new RelayError("Ladder's factory is not deployed yet, so no errand can be funded.", 503);
+  }
+
   const used = await pub.readContract({ address: USDC, abi: usdcAbi, functionName: "authorizationState", args: [a.from, a.nonce] });
   let fundTx: Hex | null = null;
   if (used) {
