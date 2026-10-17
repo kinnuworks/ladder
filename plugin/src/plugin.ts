@@ -156,7 +156,7 @@ function createServer() {
     {
       title: "Run a step",
       description:
-        "Run one committed step of the errand. It spends from the errand account without another PayBox approval, within what the user approved: at most the step's cap, once. Each step takes two calls: the first releases the step's cap to its one-time key; the second places the call or the order. Steps run in order; to skip an earlier step, give skip_reason. Escalate only when the previous step did not get the job done, and say why in `reason`. For the certified letter, pass the full letter in `letter`; the first call returns a PDF preview and the price, which the user must approve before you call again with confirm_letter_sha256. Never put the errand key or any key into `reason` or `letter`.",
+        "Run one committed step of the errand. It spends from the errand account without another PayBox approval, within what the user approved: at most the step's cap, once. A call step takes two calls of this tool: the first releases the step's cap to its one-time key; the second places the call. Steps run in order; to skip an earlier step, give skip_reason. Escalate only when the previous step did not get the job done, and say why in `reason`. For the certified letter, pass the full letter in `letter`: the first call returns a PDF preview and the price and moves no money; only after the user approves that exact letter, call again with confirm_letter_sha256 (once to release the cap, once more to mail it). Never put the errand key or any key into `reason` or `letter`.",
       inputSchema: z
         .object({
           errand_key: errandKey,

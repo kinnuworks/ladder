@@ -14,7 +14,7 @@ const EXAMPLE = `{
 }`;
 
 function Check({ ok, children }: { ok: boolean; children: React.ReactNode }) {
-  return <li className={ok ? "" : "bad"}>{children}</li>;
+  return <li className={ok ? "" : "is-bad"}>{children}</li>;
 }
 
 export default async function VerifyPage({ searchParams }: { searchParams: Promise<{ terms?: string | string[] }> }) {
@@ -32,43 +32,50 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
   }
 
   return (
-    <main className="wrap">
-      <h1>Verify an errand</h1>
-      <p className="lede">
+    <main className="page app">
+      <div className="container" style={{ maxWidth: 820 }}>
+      <h1>Verify an errand.</h1>
+      <p className="lead">
         Paste an errand&rsquo;s terms. This page recomputes the errand address, checks whether a contract is deployed
         there, and compares the terms it stores with the ones you pasted.
       </p>
-      <p className="muted small">
+      <p className="t-small" style={{ marginTop: 12 }}>
         Terms are public: owner, session signer, expiry and rungs root. Never paste an errand key (it starts with{" "}
         <code>ldr1_</code>); it holds the keys that can spend from the errand.
       </p>
 
-      <form className="verify" method="get" action="/verify">
-        <label htmlFor="terms" className="small muted">
+      <form className="card app-section" method="get" action="/verify" style={{ display: "grid", gap: 10 }}>
+        <label htmlFor="terms" className="t-small">
           Terms as JSON. factory and implementation are optional; this site&rsquo;s deployment is used when they are left
           out.
         </label>
-        <textarea id="terms" name="terms" defaultValue={input} placeholder={EXAMPLE} spellCheck={false} />
-        <button type="submit">Check these terms</button>
+        <textarea className="input" id="terms" name="terms" defaultValue={input} placeholder={EXAMPLE} spellCheck={false} />
+        <div>
+          <button className="btn btn-ink" type="submit">
+            Check these terms
+          </button>
+        </div>
       </form>
 
-      {parsed && !parsed.ok && <p className="notice danger">{parsed.message}</p>}
-      {readError && <p className="notice danger">The chain could not be read just now. Try again in a moment.</p>}
+      {parsed && !parsed.ok && <p className="notice is-danger">{parsed.message}</p>}
+      {readError && <p className="notice is-danger">The chain could not be read just now. Try again in a moment.</p>}
 
       {parsed?.ok && result && (
         <>
-          <h2>Result</h2>
-          <dl className="terms">
+          <section className="app-section">
+          <h2>Result.</h2>
+          <div className="card" style={{ display: "grid", gap: 16 }}>
+          <dl className="kv">
             <dt>Predicted errand address</dt>
             <dd>
               <Addr a={result.predicted} full />
               <br />
-              <Link href={`/e/${result.predicted}`} className="small">
+              <Link href={`/e/${result.predicted}`} className="t-small">
                 Open its errand page
               </Link>
             </dd>
           </dl>
-          <ul className="check">
+          <ul className="checks">
             {result.factoryIsLadder !== null && (
               <Check ok={result.factoryIsLadder}>
                 {result.factoryIsLadder ? "The factory is the Ladder factory this site uses." : "The factory is not the Ladder factory this site uses."}
@@ -93,13 +100,13 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
             )}
           </ul>
           {parsed.filled.length > 0 && (
-            <p className="muted small">Filled in from this site&rsquo;s deployment: {parsed.filled.join(", ")}.</p>
+            <p className="t-micro">Filled in from this site&rsquo;s deployment: {parsed.filled.join(", ")}.</p>
           )}
           {result.stored.length > 0 && (
             <>
-              <h3>Stored terms</h3>
-              <div className="table-scroll">
-                <table>
+              <h3 className="t-title">Stored terms</h3>
+              <div className="table-wrap">
+                <table className="data">
                   <thead>
                     <tr>
                       <th>Field</th>
@@ -110,10 +117,10 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
                   </thead>
                   <tbody>
                     {result.stored.map((s) => (
-                      <tr key={s.field} className={s.match ? "" : "flagged"}>
+                      <tr key={s.field} className={s.match ? "" : "is-flagged"}>
                         <td>{s.field}</td>
-                        <td className="mono small">{s.expected}</td>
-                        <td className="mono small">{s.onChain}</td>
+                        <td className="mono">{s.expected}</td>
+                        <td className="mono">{s.onChain}</td>
                         <td>{s.match ? "Yes" : "No"}</td>
                       </tr>
                     ))}
@@ -122,8 +129,11 @@ export default async function VerifyPage({ searchParams }: { searchParams: Promi
               </div>
             </>
           )}
+          </div>
+          </section>
         </>
       )}
+      </div>
     </main>
   );
 }

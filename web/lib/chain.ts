@@ -37,6 +37,7 @@ export const errandAbi = parseAbi([
   "function rungsRoot() view returns (bytes32)",
   "function factory() view returns (address)",
   "function refundWithSig(bytes sessionSig)",
+  "function refund()",
 ]);
 
 let cachedPublic: PublicClient | null = null;

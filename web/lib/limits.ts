@@ -4,7 +4,7 @@
 // which every instance sees the same way.
 import type { Address } from "viem";
 import { publicClient, relayerAddress } from "./chain";
-import { RelayError } from "./relay";
+import { RelayError } from "./errors";
 
 const HOUR = 3_600_000;
 const BLOCKS_PER_DAY = 43_200n; // Base produces a block every 2 seconds

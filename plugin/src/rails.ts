@@ -251,7 +251,7 @@ export async function runRung(d: Decoded & { index: number; reason: string; lett
   const hash = letterHash(d.letter);
 
   if (!d.confirmLetter) {
-    // Quote, create the unpaid draft so the user can read the exact PDF, and release the cap.
+    // Quote and create the unpaid draft so the user can read the exact PDF. No money moves yet.
     const v = await fetchWithTimeout(`${POSTALFORM}/validate`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(order) }, dl.left(3000));
     const quote = (await v.json().catch(() => ({}))) as any;
     if (v.status !== 200) throw new RailRefused("LETTER_INVALID", JSON.stringify(quote).slice(0, 400));
@@ -259,20 +259,28 @@ export async function runRung(d: Decoded & { index: number; reason: string; lett
     if (price > rung.max) throw new RailRefused("OVER_STEP_CAP", `The letter costs $${quote.quote.price_usd}; this step is capped at $${(Number(rung.max) / 1e6).toFixed(2)}.`);
     const draft = await fetchWithTimeout(POSTALFORM, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(order) }, dl.left(3500));
     const challenge = await readChallenge(draft);
-    const tx = released ? undefined : await releaseCap(d, d.index, dl);
     return {
       status: "awaiting_letter_approval",
       jobId: String(challenge.body.order_id ?? order.request_id),
       paid: { amount: "0" },
-      next: "Show the user the preview and the price. Only if they approve this exact letter, run this step again with confirm_letter_sha256.",
-      detail: { price_usd: quote.quote.price_usd, preview_url: challenge.body.preview_url ?? null, letter_sha256: hash, ...(tx ? { release_tx: tx } : {}), step_key: rung.to },
+      next: "Show the user the preview and the price. Only if they approve this exact letter, run this step again with confirm_letter_sha256. Nothing has been paid.",
+      detail: { price_usd: quote.quote.price_usd, preview_url: challenge.body.preview_url ?? null, letter_sha256: hash, step_key: rung.to },
     };
   }
 
   if (d.confirmLetter.toLowerCase() !== hash.toLowerCase()) {
     throw new RailRefused("LETTER_CHANGED", "This is not the letter the user approved. Show the new preview and get approval again.");
   }
-  if (!released) throw new RailRefused("NOT_RELEASED", "Run the letter step once without confirm_letter_sha256 first.");
+  if (!released) {
+    const tx = await releaseCap(d, d.index, dl);
+    return {
+      status: "released",
+      jobId: "",
+      paid: { amount: "0" },
+      next: "The letter is approved and the step's cap now sits on its one-time key. Run this step again with the same confirm_letter_sha256 to mail it.",
+      detail: { release_tx: tx, step_key: rung.to, letter_sha256: hash },
+    };
+  }
   const draft = await fetchWithTimeout(POSTALFORM, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(order) }, dl.left(3000));
   const challenge: Challenge = await readChallenge(draft);
   const orderId = String(challenge.body.order_id ?? order.request_id);

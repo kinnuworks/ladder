@@ -5,6 +5,7 @@ import { getAddress } from "viem";
 import { requireConfig } from "@/lib/config";
 import { checkFundRequest } from "@/lib/fund";
 import { errorResponse, fail, json, options, readJson } from "@/lib/http";
+import { clientIp, reserveTxs } from "@/lib/limits";
 import { RelayError, settleFunding } from "@/lib/relay";
 import { encodePlanParam } from "@/lib/schema";
 import {
@@ -60,6 +61,7 @@ export async function POST(req: Request): Promise<Response> {
     const ok = checkAuthorization(authorization, { errand, budget, owner: terms.owner }, now);
     if (!ok.ok) return challenge(ok.reason, { version, reason: ok.reason, payer: authorization.from });
 
+    await reserveTxs(2, clientIp(req));
     let result;
     try {
       result = await settleFunding({ terms, errand, budget, authorization, signature });
@@ -78,7 +80,9 @@ export async function POST(req: Request): Promise<Response> {
         errand,
         fundTx: result.fundTx,
         openTx: result.openTx,
-        page: `${cfg.publicUrl}/e/${errand}?plan=${encodePlanParam(plan)}`,
+        page: `${cfg.publicUrl}/e/${errand}`,
+        // Opt-in link that also labels each step: business name, rung labels, rails, runners and caps.
+        pageWithPlan: `${cfg.publicUrl}/e/${errand}?plan=${encodePlanParam(plan)}`,
       },
       200,
       headers,

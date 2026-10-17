@@ -1,34 +1,28 @@
-// Everything the relayer sends: funding settlement, factory.open, rung releases (move), runner
-// sweeps and refunds. Each one is simulated first, then sent, then waited on.
+// Everything the relayer sends: funding settlement, factory.open, rung releases (move), and the
+// finish bundle (runner sweeps to the owner, then the errand refund). Each transaction is
+// simulated before it is sent.
 import {
   type Address,
   type Hex,
   type Log,
-  decodeEventLog,
-  getAddress,
-  parseSignature,
-  recoverAddress,
   encodeAbiParameters,
+  formatUnits,
+  getAddress,
   keccak256,
   parseAbiParameters,
+  parseSignature,
+  recoverAddress,
   verifyTypedData,
 } from "viem";
 import { CHAIN_ID, REFUND_TYPEHASH, USDC, type Terms } from "./core";
 import { errandAbi, factoryAbi, publicClient, relayer, usdcAbi } from "./chain";
-import type { ParsedAuthorization } from "./schema";
-import type { ErrorReason } from "./x402";
+import { RelayError } from "./errors";
+import type { ParsedAuthorization, Sweep } from "./schema";
 
-const RECEIPT_TIMEOUT_MS = 60_000;
+export { RelayError };
 
-export class RelayError extends Error {
-  constructor(
-    message: string,
-    public status: number,
-    public reason?: ErrorReason,
-  ) {
-    super(message);
-  }
-}
+const FUND_RECEIPT_TIMEOUT_MS = 60_000;
+export const MOVE_RECEIPT_TIMEOUT_MS = 4_000;
 
 const transferTypes = {
   TransferWithAuthorization: [
@@ -72,7 +66,8 @@ export async function verifyPayerSignature(a: ParsedAuthorization, signature: He
   }
 }
 
-function transferArgs(a: ParsedAuthorization, signature: Hex) {
+/** 65-byte signatures use the v,r,s overload of transferWithAuthorization; anything else the bytes one. */
+export function transferArgs(a: ParsedAuthorization, signature: Hex) {
   const head = [a.from, a.to, BigInt(a.value), BigInt(a.validAfter), BigInt(a.validBefore), a.nonce] as const;
   if (signature.length === 132) {
     const s = parseSignature(signature);
@@ -82,43 +77,44 @@ function transferArgs(a: ParsedAuthorization, signature: Hex) {
   return [...head, signature] as const;
 }
 
-async function sendTransferWithAuthorization(a: ParsedAuthorization, signature: Hex) {
-  const pub = publicClient();
+function short(err: unknown): string {
+  const e = err as { shortMessage?: string; message?: string };
+  return (e?.shortMessage ?? e?.message ?? "unknown error").split("\n")[0]!.slice(0, 200);
+}
+
+async function simulateTransfer(a: ParsedAuthorization, signature: Hex) {
   const wallet = relayer();
-  let request;
   try {
-    ({ request } = await pub.simulateContract({
+    const { request } = await publicClient().simulateContract({
       account: wallet.account,
       address: USDC,
       abi: usdcAbi,
       functionName: "transferWithAuthorization",
       args: transferArgs(a, signature) as never,
-    }));
+    });
+    return request;
   } catch (err) {
     throw new RelayError(`USDC would reject this transfer: ${short(err)}`, 422, "invalid_transaction_state");
   }
-  const { tx, blockNumber } = await sendAndWait(request);
-  return { tx, blockNumber };
 }
 
-async function sendAndWait(request: unknown): Promise<{ tx: Hex; blockNumber: bigint; logs: Log[] }> {
-  const pub = publicClient();
-  const wallet = relayer();
-  const tx = await wallet.writeContract(request as never);
-  const receipt = await pub.waitForTransactionReceipt({ hash: tx, timeout: RECEIPT_TIMEOUT_MS });
+async function send(request: unknown, nonce?: number): Promise<Hex> {
+  return relayer().writeContract({ ...(request as object), ...(nonce === undefined ? {} : { nonce }) } as never);
+}
+
+async function sendAndWait(request: unknown, timeout = FUND_RECEIPT_TIMEOUT_MS): Promise<{ tx: Hex; blockNumber: bigint; logs: Log[] }> {
+  const tx = await send(request);
+  const receipt = await publicClient().waitForTransactionReceipt({ hash: tx, timeout });
   if (receipt.status !== "success") throw new RelayError(`Transaction ${tx} reverted.`, 502, "unexpected_settle_error");
   return { tx, blockNumber: receipt.blockNumber, logs: receipt.logs };
-}
-
-function short(err: unknown): string {
-  const e = err as { shortMessage?: string; message?: string };
-  return (e?.shortMessage ?? e?.message ?? "unknown error").split("\n")[0]!.slice(0, 200);
 }
 
 async function hasCode(addr: Address): Promise<boolean> {
   const code = await publicClient().getCode({ address: addr });
   return !!code && code !== "0x";
 }
+
+// --- funding ----------------------------------------------------------------
 
 /** Settle the funding payment and open the errand. Retrying an already-settled payment only opens. */
 export async function settleFunding(input: {
@@ -142,14 +138,13 @@ export async function settleFunding(input: {
     if (!(await verifyPayerSignature(a, signature))) {
       throw new RelayError("The payment signature does not verify for the payer.", 402, "invalid_exact_evm_payload_signature");
     }
-    fundTx = (await sendTransferWithAuthorization(a, signature)).tx;
+    fundTx = (await sendAndWait(await simulateTransfer(a, signature))).tx;
   }
 
   let openTx: Hex | null = null;
   if (!(await hasCode(errand))) {
-    const wallet = relayer();
     const { request } = await pub.simulateContract({
-      account: wallet.account,
+      account: relayer().account,
       address: terms.factory,
       abi: factoryAbi,
       functionName: "open",
@@ -160,60 +155,119 @@ export async function settleFunding(input: {
   return { fundTx, openTx };
 }
 
-/** Release a rung: the errand's ERC-1271 signature authorizes a USDC transfer to the rung's runner. */
-export async function relayMove(input: { errand: Address; authorization: ParsedAuthorization; signature: Hex }) {
-  if (input.authorization.from !== input.errand) throw new RelayError("authorization.from must be the errand.", 400);
-  if (input.signature.length === 132) throw new RelayError("A rung release carries the errand's ERC-1271 signature, not a 65-byte one.", 400);
-  return sendTransferWithAuthorization(input.authorization, input.signature);
+// --- move: release a rung to its runner -------------------------------------
+
+/** Checks on a release before any RPC call. Returns an error message, or null when acceptable. */
+export function checkMove(input: { errand: Address; authorization: ParsedAuthorization; signature: Hex }): string | null {
+  if (input.authorization.from !== input.errand) return "authorization.from must be the errand.";
+  if (BigInt(input.authorization.value) === 0n) return "A release must move more than zero.";
+  if (input.signature.length === 132) return "A rung release carries the errand's ERC-1271 signature, not a 65-byte one.";
+  return null;
 }
 
-/** Return a runner's unspent USDC to the errand's owner with the runner's EIP-3009 signature. */
-export async function relaySweep(input: { errand: Address; runner: Address; authorization: ParsedAuthorization; signature: Hex }) {
-  const a = input.authorization;
-  if (a.from !== input.runner) throw new RelayError("authorization.from must be the runner.", 400);
-  if (input.signature.length !== 132) throw new RelayError("A runner sweep needs a 65-byte signature.", 400);
-  const owner = getAddress(await publicClient().readContract({ address: input.errand, abi: errandAbi, functionName: "owner" }));
-  if (a.to !== owner) throw new RelayError("A sweep can only pay the errand's owner.", 400);
-  return sendTransferWithAuthorization(a, input.signature);
+/** Send the release and wait briefly. If it is not mined in time, report it as pending. */
+export async function relayMove(input: { errand: Address; authorization: ParsedAuthorization; signature: Hex }) {
+  const problem = checkMove(input);
+  if (problem) throw new RelayError(problem, 400);
+  const tx = await send(await simulateTransfer(input.authorization, input.signature));
+  try {
+    const receipt = await publicClient().waitForTransactionReceipt({ hash: tx, timeout: MOVE_RECEIPT_TIMEOUT_MS, pollingInterval: 500 });
+    if (receipt.status !== "success") throw new RelayError(`Transaction ${tx} reverted.`, 502);
+    return { tx, blockNumber: receipt.blockNumber, pending: false };
+  } catch (err) {
+    if (err instanceof RelayError) throw err;
+    return { tx, blockNumber: null, pending: true };
+  }
 }
+
+// --- finish: sweep runners to the owner, then refund ----------------------------
 
 export function refundDigest(errand: Address): Hex {
   return keccak256(encodeAbiParameters(parseAbiParameters("bytes32, address, uint256"), [REFUND_TYPEHASH, errand, BigInt(CHAIN_ID)]));
 }
 
-/** Relay refundWithSig. The contract sends everything to the owner; we only check the signer first. */
-export async function relayRefund(input: { errand: Address; sessionSig: Hex }) {
+/**
+ * Checks on a finish bundle. `received` holds the runners that have received USDC from this
+ * errand, from Transfer logs. Returns an error message, or null when every sweep is acceptable.
+ */
+export function checkFinish(input: { owner: Address; sweeps: Sweep[]; received: ReadonlySet<Address> }): string | null {
+  const seen = new Set<Address>();
+  for (const [i, s] of input.sweeps.entries()) {
+    const a = s.authorization;
+    if (a.from !== s.runner) return `Sweep ${i + 1}: authorization.from must be the runner.`;
+    if (a.to !== input.owner) return `Sweep ${i + 1}: a sweep can only pay the errand's owner.`;
+    if (BigInt(a.value) === 0n) return `Sweep ${i + 1}: the amount must be more than zero.`;
+    if (s.signature.length !== 132) return `Sweep ${i + 1}: a runner sweep needs a 65-byte signature.`;
+    if (!input.received.has(s.runner)) return `Sweep ${i + 1}: this runner never received USDC from this errand.`;
+    if (seen.has(s.runner)) return `Sweep ${i + 1}: this runner is swept twice.`;
+    seen.add(s.runner);
+  }
+  return null;
+}
+
+export function usd2(atomic: bigint): string {
+  return Number(formatUnits(atomic, 6)).toFixed(2);
+}
+
+/**
+ * Relay the sweeps and the refund with consecutive nonces, without waiting for receipts.
+ * `findReceived` returns the runners that have received USDC from the errand.
+ */
+export async function relayFinish(input: {
+  errand: Address;
+  sweeps: Sweep[];
+  sessionSig: Hex;
+  findReceived: (runners: Address[]) => Promise<Set<Address>>;
+}): Promise<{ txs: Hex[]; refundedUsd: string }> {
   const pub = publicClient();
-  const [signer, closed] = await Promise.all([
-    pub.readContract({ address: input.errand, abi: errandAbi, functionName: "sessionSigner" }),
-    pub.readContract({ address: input.errand, abi: errandAbi, functionName: "closed" }),
+  const { errand, sweeps, sessionSig } = input;
+  const [owner, signer, closed, balance] = await Promise.all([
+    pub.readContract({ address: errand, abi: errandAbi, functionName: "owner" }).then(getAddress),
+    pub.readContract({ address: errand, abi: errandAbi, functionName: "sessionSigner" }).then(getAddress),
+    pub.readContract({ address: errand, abi: errandAbi, functionName: "closed" }),
+    pub.readContract({ address: USDC, abi: usdcAbi, functionName: "balanceOf", args: [errand] }),
   ]);
-  if (closed) throw new RelayError("This errand is already closed.", 409);
-  let recovered: Address;
+
+  let recovered: Address | null = null;
   try {
-    recovered = await recoverAddress({ hash: refundDigest(input.errand), signature: input.sessionSig });
+    recovered = await recoverAddress({ hash: refundDigest(errand), signature: sessionSig });
   } catch {
-    throw new RelayError("The refund signature is malformed.", 400);
+    // reported below
   }
-  if (recovered !== getAddress(signer)) throw new RelayError("The refund signature is not from this errand's session signer.", 400);
+  if (recovered !== signer) throw new RelayError("The refund signature is not from this errand's session signer.", 400);
+
+  const received = sweeps.length ? await input.findReceived(sweeps.map((s) => s.runner)) : new Set<Address>();
+  const problem = checkFinish({ owner, sweeps, received });
+  if (problem) throw new RelayError(problem, 400);
+  if (closed && sweeps.length === 0) throw new RelayError("This errand is already closed and there is nothing to sweep.", 409);
+
   const wallet = relayer();
-  const { request } = await pub.simulateContract({
-    account: wallet.account,
-    address: input.errand,
+  const requests = await Promise.all([
+    ...sweeps.map((s) => simulateTransfer(s.authorization, s.signature)),
+    ...(closed
+      ? []
+      : [
+          pub
+            .simulateContract({ account: wallet.account, address: errand, abi: errandAbi, functionName: "refundWithSig", args: [sessionSig] })
+            .then((r) => r.request),
+        ]),
+  ]);
+
+  const nonce = await pub.getTransactionCount({ address: wallet.account.address, blockTag: "pending" });
+  const txs: Hex[] = [];
+  for (const [i, request] of requests.entries()) txs.push(await send(request, nonce + i));
+
+  const swept = sweeps.reduce((sum, s) => sum + BigInt(s.authorization.value), 0n);
+  return { txs, refundedUsd: usd2((closed ? 0n : balance) + swept) };
+}
+
+/** Refund one expired errand with the permissionless refund(). Used by the cron route. */
+export async function relayExpiredRefund(errand: Address): Promise<Hex> {
+  const { request } = await publicClient().simulateContract({
+    account: relayer().account,
+    address: errand,
     abi: errandAbi,
-    functionName: "refundWithSig",
-    args: [input.sessionSig],
+    functionName: "refund",
   });
-  const sent = await sendAndWait(request);
-  let refunded = 0n;
-  for (const log of sent.logs) {
-    if (getAddress(log.address) !== input.errand) continue;
-    try {
-      const ev = decodeEventLog({ abi: errandAbi, data: log.data, topics: log.topics });
-      if (ev.eventName === "Refunded") refunded = ev.args.amount;
-    } catch {
-      // not a Refunded log
-    }
-  }
-  return { tx: sent.tx, blockNumber: sent.blockNumber, refunded };
+  return send(request);
 }

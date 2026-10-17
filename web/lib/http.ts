@@ -1,7 +1,7 @@
 // Response helpers shared by the API routes. Error text is scrubbed of the RPC URL (which can
 // carry a provider key) before it is logged or returned; the relayer key is never in scope here.
 import { ConfigError, readConfig } from "./config";
-import { RelayError } from "./relay";
+import { RelayError } from "./errors";
 
 export const CORS_HEADERS = {
   "access-control-allow-origin": "*",

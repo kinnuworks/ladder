@@ -261,7 +261,7 @@ export function shapeErrand(raw: RawErrand): ErrandView {
 const MAX_SPLIT_DEPTH = 12;
 
 /** getLogs over a range, halving the range whenever the RPC refuses it as too large. */
-async function logsAdaptive<T>(from: bigint, to: bigint, fetch: (from: bigint, to: bigint) => Promise<T[]>, depth = 0): Promise<T[]> {
+export async function logsAdaptive<T>(from: bigint, to: bigint, fetch: (from: bigint, to: bigint) => Promise<T[]>, depth = 0): Promise<T[]> {
   try {
     return await fetch(from, to);
   } catch (err) {
@@ -277,7 +277,7 @@ async function logsAdaptive<T>(from: bigint, to: bigint, fetch: (from: bigint, t
 
 const transferEvent = usdcAbi.find((x) => x.type === "event" && x.name === "Transfer")!;
 
-async function transfers(args: { from?: Address; to?: Address }, fromBlock: bigint, toBlock: bigint): Promise<TransferLog[]> {
+async function transfers(args: { from?: Address; to?: Address | Address[] }, fromBlock: bigint, toBlock: bigint): Promise<TransferLog[]> {
   const pub = publicClient();
   const logs = await logsAdaptive(fromBlock, toBlock, (f, t) =>
     pub.getLogs({ address: USDC, event: transferEvent, args, fromBlock: f, toBlock: t, strict: true }),
@@ -360,4 +360,28 @@ export async function readErrand(address: Address, plan: Plan | null, planError:
 /** JSON-safe view (bigints are already strings in ErrandView). */
 export async function loadErrandView(address: Address, plan: Plan | null, planError: string | null): Promise<ErrandView> {
   return shapeErrand(await readErrand(address, plan, planError));
+}
+
+/** The runners among `runners` that appear as recipients of a USDC transfer from `errand`. */
+export function receivedRunners(errand: Address, runners: Address[], logs: TransferLog[]): Set<Address> {
+  const wanted = new Set(runners.map((r) => getAddress(r)));
+  const out = new Set<Address>();
+  for (const l of logs) if (l.from === errand && wanted.has(l.to)) out.add(l.to);
+  return out;
+}
+
+/** Look up which runners have been paid by the errand, from DEPLOY_BLOCK (or 32 days back) to now. */
+export async function findReceived(errand: Address, runners: Address[]): Promise<Set<Address>> {
+  const cfg = readConfig();
+  const pub = publicClient();
+  const [latest, expiry] = await Promise.all([
+    pub.getBlock({ blockTag: "latest" }),
+    pub.readContract({ address: errand, abi: errandAbi, functionName: "expiry" }),
+  ]);
+  // Releases happen at most 30 days before expiry, so start there, with a day of margin.
+  const back = BigInt(Math.max(0, Math.ceil((Number(latest.timestamp) - (Number(expiry) - 31 * 86_400)) / BASE_BLOCK_SECONDS)));
+  let fromBlock = latest.number > back ? latest.number - back : 0n;
+  if (cfg.deployBlock && cfg.deployBlock > fromBlock) fromBlock = cfg.deployBlock;
+  const logs = await transfers({ from: errand, to: runners }, fromBlock, latest.number);
+  return receivedRunners(errand, runners, logs);
 }
