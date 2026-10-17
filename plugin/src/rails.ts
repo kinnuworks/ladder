@@ -227,8 +227,7 @@ export async function runRung(
   assertNoSecrets("reason", d.reason, pieces);
   assertNoSecrets("letter", d.letter, pieces);
 
-  const runnerBalance = await usdcBalance(rung.to, dl);
-  const released = await stepUsed(d.errand, rung.nonce, dl);
+  const [runnerBalance, released] = await Promise.all([usdcBalance(rung.to, dl), stepUsed(d.errand, rung.nonce, dl)]);
 
   if (rung.rail === "phone" || rung.rail === "human") {
     if (rung.rail === "phone") assertCallingHours(brief.business.timeZone, d.now);

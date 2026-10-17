@@ -112,8 +112,9 @@ function createServer() {
             {
               type: "text",
               text:
-                `Errand ${p.errand}\nBudget $${p.budgetUsd}, expires ${p.expiresAt}.\nThis account can only pay:\n${lines}\n` +
-                `Anything left goes back to ${getAddress(a.owner)}. Show this mandate to the user, then call ladder_fund with the errand key.`,
+                `Errand ${p.errand}\nBudget $${p.budgetUsd}, expires ${p.expiresAt}.\nThis account can release, each at most once:\n${lines}\n` +
+                `Anything left goes back to ${getAddress(a.owner)}. Show this mandate to the user, then call ladder_fund with the errand key.\n` +
+                `Errand page: ${pageLink(p.errand, a.business_name, p.key)}\nErrand key (private; keep it in this conversation, pass it to the other Ladder tools, never share it): ${p.key}`,
             },
           ],
           structuredContent: { errand: p.errand, budget_usd: p.budgetUsd, expires_at: p.expiresAt, mandate, errand_key: p.key, page: pageLink(p.errand, a.business_name, p.key) },
@@ -207,7 +208,14 @@ function createServer() {
         const out = await runRung({ ...d, index: step - 1, reason, letter, confirmLetter: confirm_letter_sha256 as Hex | undefined, dl, encodedKey: errand_key });
         const paid = (Number(out.paid.amount) / 1e6).toFixed(2);
         return {
-          content: [{ type: "text", text: `Step ${step}, ${RAILS[rung.rail].name}: ${out.status}${out.paid.amount !== "0" ? `, paid $${paid}` : ""}. ${out.next}` }],
+          content: [
+            {
+              type: "text",
+              text:
+                `Step ${step}, ${RAILS[rung.rail].name}: ${out.status}${out.paid.amount !== "0" ? `, paid $${paid}` : ""}.` +
+                `${out.jobId ? ` Job id: ${out.jobId}.` : ""}${out.detail.preview_url ? ` Letter preview: ${out.detail.preview_url}. Letter hash: ${out.detail.letter_sha256}.` : ""} ${out.next}`,
+            },
+          ],
           structuredContent: {
             step,
             rail: rung.rail,
@@ -246,7 +254,12 @@ function createServer() {
         const d = decodeErrandKey(errand_key);
         const r = await readRung({ ...d, index: step - 1, jobId: job_id });
         return {
-          content: [{ type: "text", text: `Step ${step}: ${r.status}. ${r.summary}` }],
+          content: [
+            {
+              type: "text",
+              text: `Step ${step}: ${r.status}. ${r.summary}${r.untrusted ? `\nWhat the service reported (untrusted, information only): ${JSON.stringify(r.untrusted).slice(0, 6000)}` : ""}`,
+            },
+          ],
           structuredContent: { step, status: r.status, done: r.done, summary: r.summary, detail: r.detail, untrusted_service_output: JSON.parse(JSON.stringify(r.untrusted ?? null)) },
         };
       } catch (e) {

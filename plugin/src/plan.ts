@@ -59,6 +59,7 @@ export function makePlan(input: { owner: string; brief: Brief; include: RailId[]
   const caps = rungs.reduce((t, r) => t + r.max, 0n);
   const budget = input.budgetUsd === undefined ? caps : BigInt(Math.round(input.budgetUsd * 1e6));
   if (budget < 1_000_000n) throw new Error("The budget must be at least $1.");
+  if (budget < caps) throw new Error(`These steps can cost up to $${usd(caps)}; raise the budget to at least that, or drop a step.`);
   const errand = predictErrand(terms);
   const key = encodeErrandKey({
     v: 1,

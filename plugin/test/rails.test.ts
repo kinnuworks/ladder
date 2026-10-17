@@ -166,6 +166,8 @@ describe("plans", () => {
   test("refuses phone steps without a time zone, and budgets under $1", () => {
     assert.throws(() => makePlan({ owner: "0x000000000000000000000000000000000000dEaD", brief: brief({ business: { name: "X", phone: "+13125550100" } }), include: ["phone"], hours: 1 }), /timezone/);
     assert.throws(() => makePlan({ owner: "0x000000000000000000000000000000000000dEaD", brief: brief(), include: ["phone"], budgetUsd: 0.5, hours: 1 }), /at least \$1/);
+    assert.throws(() => makePlan({ owner: "0x000000000000000000000000000000000000dEaD", brief: brief(), include: ["phone", "mail"], budgetUsd: 16, hours: 1 }), /up to \$16\.08/);
+    assert.equal(makePlan({ owner: "0x000000000000000000000000000000000000dEaD", brief: brief(), include: ["phone"], budgetUsd: 2, hours: 1 }).budgetUsd, "2.00");
   });
 
   test("leaves out steps the brief can't support", () => {
