@@ -8,11 +8,11 @@ import { addressUrl, sourcifyUrl } from "@/lib/format";
 export const metadata: Metadata = { title: "For judges" };
 export const revalidate = 300;
 
-type Tag = "VERIFIED-LIVE" | "REPRODUCIBLE" | "MODELED" | "NOT-CLAIMED";
+type Tag = "VERIFIED-LIVE" | "REPRODUCIBLE" | "SHOWN-NOT-SPENT" | "NOT-CLAIMED";
 const TAG_CLASS: Record<Tag, string> = {
   "VERIFIED-LIVE": "live",
   REPRODUCIBLE: "repro",
-  MODELED: "modeled",
+  "SHOWN-NOT-SPENT": "modeled",
   "NOT-CLAIMED": "not",
 };
 
@@ -45,58 +45,53 @@ export default async function JudgesPage() {
   const example = cfg.exampleErrand
     ? `/e/${cfg.exampleErrand}${cfg.examplePlan ? `?plan=${encodeURIComponent(cfg.examplePlan)}` : ""}`
     : null;
-  const live = (fallback: Tag) => (example ? "VERIFIED-LIVE" : fallback);
   const [factoryVerified, implVerified] = await Promise.all([
     sourcifyMatch(cfg.factory),
     sourcifyMatch(cfg.implementation),
   ]);
   const sourceVerified = factoryVerified === true && implVerified === true;
 
+  const exampleLink = example ? { href: example, text: "Example errand" } : null;
   const claims: Claim[] = [
     {
-      claim:
-        "An errand's address is fixed by its terms before the errand exists, so it can be funded first and checked by anyone.",
-      tag: live("REPRODUCIBLE"),
+      claim: "One PayBox approval funds an errand at an address fixed by its terms.",
+      tag: example ? "VERIFIED-LIVE" : "REPRODUCIBLE",
       how: example
-        ? "Open the example errand, copy its terms into the verify page, and compare with factory.predict() on Base."
-        : "The interop test deploys the factory on a Base fork and compares its predict() with core.ts.",
-      link: example ? { href: example, text: "Example errand" } : src("plugin/test/interop.test.ts"),
+        ? "The example errand's first row is the funding transfer from the owner. Paste its terms into the verify page to recompute the address."
+        : "The interop test deploys the factory on a Base fork, funds an errand before it exists and opens it.",
+      link: exampleLink ?? src("plugin/test/interop.test.ts"),
     },
     {
-      claim: "The errand pays only committed rungs: each at most once, at most its cap, and only before expiry.",
+      claim: "The plugin recomputes the errand address and refuses to fund anything else.",
       tag: "REPRODUCIBLE",
-      how: "Unit, fuzz and invariant tests on Errand.isValidSignature, plus a fork test against real Base USDC.",
+      how: "ladder_fund fetches the 402 itself and refuses unless the payee is the errand address and the amount is the budget.",
+      link: src("plugin/test/core.test.ts"),
+    },
+    {
+      claim: "An errand releases money only for a committed step, at most its cap, at most once, before expiry.",
+      tag: "REPRODUCIBLE",
+      how: "Unit, fuzz and invariant tests on the errand contract, plus fork tests against real Base USDC.",
       link: src("contracts/test/Invariants.t.sol"),
     },
     {
-      claim: "Refunds can only go to the owner. The owner can refund at any time and anyone can after expiry.",
+      claim: "Leftover money can only go back to the owner, and after expiry anyone can trigger that.",
       tag: "REPRODUCIBLE",
-      how: "Contract tests for refund, refundWithSig and sweep.",
+      how: "Contract tests for refund, refundWithSig and opening an expired errand to refund it.",
       link: src("contracts/test/Errand.t.sol"),
     },
     {
-      claim: "Funding is one approval: a single x402 USDC payment straight to the errand address.",
-      tag: live("REPRODUCIBLE"),
+      claim: "A step key pays the service, and the service's transcript is read back by that key.",
+      tag: example ? "VERIFIED-LIVE" : "REPRODUCIBLE",
       how: example
-        ? "The example errand's first row is the funding transfer from the owner."
-        : "Web tests check the 402 response and reject payments with the wrong payee, amount, payer or time window.",
-      link: example ? { href: example, text: "Example errand" } : src("web/test/x402.test.ts"),
+        ? "On the example errand, each release is followed by the step key's payment to StablePhone."
+        : "The plugin's rail tests cover the two-call step; the live check comes with the first mainnet errand.",
+      link: exampleLink ?? src("plugin/src/rails.ts"),
     },
     {
-      claim:
-        "Each step uses a one-time key that receives at most its cap from the errand and pays the service directly.",
-      tag: live("MODELED"),
-      how: example
-        ? "On the example errand, each release is followed by the step key's payment to the service."
-        : "The plugin implements this flow; it has not yet run on mainnet.",
-      link: example ? { href: example, text: "Example errand" } : src("plugin/src/rails.ts"),
-    },
-    {
-      claim:
-        "Prices: StablePhone $0.54 per call, Mosbie $15 per task, PostalForm $11.40 to $14.40 per certified letter.",
-      tag: "MODELED",
-      how: "Taken from each service's payment request when the rails were built. Prices can change; rung caps bound what is paid.",
-      link: src("docs/RAILS.md"),
+      claim: "The certified-letter step shows the real quote, about $14.40, and the exact PDF before any money moves.",
+      tag: "SHOWN-NOT-SPENT",
+      how: "PostalForm's quote and preview appear in the demo. Nothing was mailed.",
+      link: src("JUDGES.md"),
     },
     {
       claim: "The plugin and this site compute errand addresses and signatures with the same code.",
@@ -109,19 +104,25 @@ export default async function JudgesPage() {
       tag: sourceVerified ? "VERIFIED-LIVE" : "NOT-CLAIMED",
       how: sourceVerified
         ? "Sourcify reports a match for the factory and the implementation."
-        : "Not yet confirmed on Sourcify.",
+        : "Not confirmed on Sourcify yet.",
       link: cfg.factory ? { href: sourcifyUrl(cfg.factory), text: "Sourcify" } : null,
     },
     {
-      claim: "The errand achieves its goal, such as a cancellation or a refund from the business.",
+      claim: "The chain checks that a step key pays the right service.",
       tag: "NOT-CLAIMED",
-      how: "Ladder limits what an agent can spend and where the money goes. Whether the business agrees is outside it.",
+      how: "The plugin checks the payee and price before the key signs. A step key can spend at most its own cap.",
+      link: src("plugin/src/rails.ts"),
+    },
+    {
+      claim: "The chain decides when to escalate.",
+      tag: "NOT-CLAIMED",
+      how: "The agent decides and states its reason in each step call.",
       link: null,
     },
     {
-      claim: "The contracts have been audited.",
+      claim: "The contracts are audited.",
       tag: "NOT-CLAIMED",
-      how: "They have not. They are small and covered by tests; read them before trusting them with more than a test amount.",
+      how: "They are not. Budgets are capped at $100.",
       link: src("contracts/src/Errand.sol"),
     },
   ];
@@ -139,19 +140,19 @@ export default async function JudgesPage() {
             <dt>
               <span className="claim-tag live">VERIFIED-LIVE</span>
             </dt>
-            <dd>Visible on Base mainnet now, linked.</dd>
+            <dd>Happened on Base mainnet, and the link proves it.</dd>
             <dt>
               <span className="claim-tag repro">REPRODUCIBLE</span>
             </dt>
-            <dd>Shown by a test you can run, including fork tests against real Base USDC.</dd>
+            <dd>A test in this repository proves it, including fork tests against real Base USDC.</dd>
             <dt>
-              <span className="claim-tag modeled">MODELED</span>
+              <span className="claim-tag modeled">SHOWN-NOT-SPENT</span>
             </dt>
-            <dd>Built and reasoned about, but not yet observed on mainnet.</dd>
+            <dd>Shown with the real service up to the point of payment, and deliberately not paid.</dd>
             <dt>
               <span className="claim-tag not">NOT-CLAIMED</span>
             </dt>
-            <dd>Something Ladder does not claim.</dd>
+            <dd>Something Ladder does not do.</dd>
           </dl>
         </div>
 
