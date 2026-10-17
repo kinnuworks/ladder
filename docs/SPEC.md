@@ -1,49 +1,46 @@
-# Ladder: build spec
+# Ladder: how it works
 
-Ladder is a PayBox plugin. You tell your AI "get this done, whatever it takes, up to $30". One passkey approval funds an errand account on Base. The account can pay only the steps you approved (an AI phone call, a human caller, certified mail), each at most once and at most its cap, before an expiry. Whatever is left goes back to you.
+Ladder is a PayBox plugin. You tell your AI "get this done, up to $16". One passkey approval funds an errand account on Base. The account can release money only for the steps you approved, each at most its cap, each once, before an expiry. Each step's money goes to a one-time key that pays the service. Whatever is left goes back to you.
 
 ## Pieces
 
 | Piece | Where | What it does |
 |---|---|---|
-| Contracts | `contracts/` | `ErrandFactory` deploys `Errand` clones at CREATE2 addresses fixed by the terms. `Errand.isValidSignature` approves only USDC `transferWithAuthorization` payments that match a committed rung. Refunds go only to the owner. |
-| Core | `plugin/src/core.ts` | Rung tree, errand address, rung signatures, refund signature, errand key encoding. Shared by plugin and web. |
-| Plugin | `plugin/` | MCP tools the agent calls. Holds no state; the agent keeps the errand key. |
-| Web + API | `web/` | Next.js app on Vercel: the funding endpoint (x402), the relayer, public errand pages, judges page. |
+| Contracts | `contracts/` | `ErrandFactory` deploys `Errand` clones at CREATE2 addresses fixed by the terms. `Errand.isValidSignature` approves only a USDC `transferWithAuthorization` that matches a committed step. Every refund path pays only the owner. |
+| Core | `plugin/src/core.ts` (copied to `web/lib/core.ts`, checked in CI) | Step tree, errand address, step signatures, refund signature, errand key encoding. |
+| Plugin | `plugin/` | Six MCP tools. Holds no state; the agent keeps the errand key. |
+| Web and API | `web/` | Funding endpoint (x402), relayer, public errand pages, verify page, judges page. |
 
-## Terms and addresses
+## Terms
 
-- Chain: Base mainnet (8453). USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913` (FiatTokenV2_2, domain name "USD Coin", version "2").
-- Terms: `owner` (the user's PayBox wallet; the only refund destination), `sessionSigner` (a fresh key made by the plugin per errand), `expiry` (unix seconds), `rungsRoot`.
-- Errand address = `factory.predict(owner, sessionSigner, expiry, rungsRoot)` = `predictErrand(terms)` in core.ts.
-- Rung leaf = `keccak256(keccak256(abi.encode(bytes32 nonce, address to, uint256 max, bytes32 salt)))`. Salts are secret; they stop anyone who sees a leaf from forging a rung.
-- Env: `FACTORY_ADDRESS`, `IMPLEMENTATION_ADDRESS`, `DEPLOY_BLOCK`, `RELAYER_PRIVATE_KEY`, `BASE_RPC_URL`, `PUBLIC_URL`.
+- Chain: Base mainnet (8453). USDC `0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913`.
+- Terms: `owner` (the user's PayBox wallet, the only refund destination), `sessionSigner` (a fresh key per errand), `expiry`, `rungsRoot`.
+- Errand address = `factory.predict(owner, sessionSigner, expiry, rungsRoot)` = `predictErrand(terms)`.
+- Step leaf = `keccak256(keccak256(abi.encode(bytes32 nonce, address to, uint256 max, bytes32 salt)))`, where `to` is the step's one-time key. Sorted-pair Merkle tree, verified with OpenZeppelin `MerkleProof`.
+- Step caps: AI call $0.54, follow-up AI call $0.54, a person calls $15 (off by default), certified letter $15. The default budget is the sum of the chosen caps.
 
-## Funding flow (one approval)
+## Flow
 
-1. Plugin `ladder_plan` makes the session key, nonces and salts, builds the root, predicts the errand address, and returns the decoded mandate plus the errand key.
-2. Plugin `ladder_fund` returns a PayBox x402 proposal: `POST {PUBLIC_URL}/api/fund` with body `{ terms, budget, plan }` and `maxAmount = budget`. Before returning, it fetches the 402 itself and refuses unless `payTo` equals the errand address it computed and the amount equals the budget.
-3. `POST /api/fund`:
-   - Without a payment header: respond `402` with x402 payment requirements. `payTo` is the errand address computed from the body's terms (pure function of the request, so the probe and the paid retry agree). Amount = budget. Scheme `exact`, network Base, asset USDC, `extra: { name: "USD Coin", version: "2" }`, `maxTimeoutSeconds: 300`. Send both the x402 v2 `PAYMENT-REQUIRED` header (base64 JSON, `x402Version: 2`, `accepts` with `network: "eip155:8453"`, `amount`) and a v1-compatible JSON body (`x402Version: 1`, `accepts` with `network: "base"`, `maxAmountRequired`, `resource`, `description`, `mimeType`, `payTo`, `asset`, `maxTimeoutSeconds`, `extra`).
-   - With `PAYMENT-SIGNATURE` (v2) or `X-PAYMENT` (v1): decode base64 JSON; check `authorization.to == errand`, `value == budget`, `from == terms.owner`, time window valid; verify the payer's EIP-712 signature (viem `verifyTypedData`; if `from` has code, use `publicClient.verifyTypedData` which handles ERC-1271/6492); simulate then send `USDC.transferWithAuthorization` from the relayer (65-byte signature → v,r,s overload; otherwise bytes overload); then `factory.open(terms)` from the relayer. Respond 200 with `{ errand, fundTx, openTx, page: PUBLIC_URL/e/<errand> }` and a `PAYMENT-RESPONSE` header (base64 JSON `{ success, transaction, network, payer }`).
-   - Reject terms with expiry in the past or more than 30 days out, budgets over 100 USDC, or a rung `to` not in the rail registry.
-4. `POST /api/refund` `{ errand, sessionSig }` relays `refundWithSig`. Money can only go to the owner, so this endpoint needs no auth.
+1. **Plan** (`ladder_plan`, free). Makes the session key, one key per step, nonces and salts; builds the root; predicts the errand address; returns the mandate and the errand key. Phone steps need the business's time zone.
+2. **Fund** (`ladder_fund`, the one PayBox approval). The plugin fetches the funding endpoint's 402 itself and refuses unless `payTo` is the errand address it computed and the amount is the budget, then returns an x402 proposal. `POST /api/fund` answers the probe with a 402 whose `payTo` is a pure function of the terms in the body. On the paid retry it checks the authorization (to the errand, the exact budget, from the owner, in its time window), settles it from the relayer, and opens the errand. The body carries only the business name and the steps; no personal details.
+3. **Step** (`ladder_step`). Steps run in order unless the agent gives `skip_reason`.
+   - Phone: call 1 releases the cap to the step key through `POST /api/move` (USDC `transferWithAuthorization` signed by the errand via ERC-1271). Call 2 has the step key pay StablePhone over x402, after checking StablePhone's fixed payee and price. Calls go out only between 9am and 6pm in the business's time zone, disclose that the caller is automated and the call is recorded, and stop if asked.
+   - Letter: call 1 quotes the letter and creates PostalForm's unpaid draft, returning the PDF preview and `letter_sha256`; no money moves. Only after the user approves that exact text: call 2 releases the cap, call 3 has the step key pay PostalForm, after checking the order's payee against the order's public status.
+   - `reason` and `letter` are refused if they contain anything that looks like a key.
+4. **Check** (`ladder_check`). The step key signs in (x402 sign-in-with-x) to read StablePhone's transcript; PostalForm's status is public. Anything the business or service said is returned under `untrusted_service_output`.
+5. **Finish** (`ladder_finish`). Signs returns of any money left on step keys plus the errand's refund, and `POST /api/finish` relays them together. After the expiry anyone can refund; money still only goes to the owner.
 
-## Public pages (no database; everything is read from chain)
+## API (web)
 
-- `/` landing: what Ladder does in one sentence, the three rungs, "one approval, chain-enforced caps, leftover comes back", links to judges page and a live example errand.
-- `/e/[address]`: the errand's live timeline: terms read from the contract (owner, expiry, root, closed), funded amount and tx, each USDC payment out of the errand labelled by rail (StablePhone, Mosbie, PostalForm; unknown payees would be a bug and are flagged red), refunds, current balance, time to expiry. Optional `?plan=<base64url JSON>` shows the human labels of the rungs (business name, goal) and is checked against the chain where possible (rung `to` and `max` must match payments seen). Every row links to Basescan.
-- `/verify`: paste terms → shows the predicted address, whether the code is deployed, and that its stored terms match.
-- `/judges`: five-minute review path, the claims ledger (each claim tagged VERIFIED-LIVE / REPRODUCIBLE / MODELED / NOT-CLAIMED with a link), test and CI badges, contract addresses on Sourcify/Basescan.
+| Route | Does |
+|---|---|
+| `POST /api/fund` | x402 v1 and v2 challenge; settles and opens. Budget 1 to 100 USDC, expiry 10 minutes to 30 days, step caps per rail. |
+| `POST /api/move` | Relays a step release from a Ladder errand (checks the clone and factory, value above zero). |
+| `POST /api/finish` | Relays step-key returns (only to the owner, only from keys the errand paid) and the errand refund. |
+| `GET /api/errand/[address]` | Everything the errand page shows, read from Base. |
+| `GET /api/cron/sweep-expired` | Refunds expired, funded errands; needs `CRON_SECRET`. |
 
-## Rail registry
+## Not enforced by the chain
 
-| Rail | payTo (Base) | Price |
-|---|---|---|
-| StablePhone AI call | `0xD219dB8179Bb9C1899eF87f39eebA9D1070c6801` | $0.54 |
-| Mosbie human call/email | `0x4603366F72023572b139D19e354e9FA3A50c634B` | $15 |
-| PostalForm certified mail | `0x3ea31de08708a6eb65f345719e6b1cdb72df0406` (probe; confirm) | $11.40 to $14.40 |
-
-## Writing rules
-
-Plain, specific English everywhere. No mention of the AI coding tools used to build this. No hype words. Sentence-case headings.
+- Escalating only when the previous step failed: the agent decides and says why.
+- That a step key pays the intended service: the plugin checks the payee and price before the key signs; a step key can spend at most its own cap.

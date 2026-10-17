@@ -84,14 +84,14 @@ export function assertNoSecrets(field: string, text: string | undefined) {
   }
 }
 
-/** Calls only between 9am and 6pm on weekdays in the business's time zone. */
+/** Calls only between 9am and 6pm in the business's time zone. Weekends are allowed, because many businesses open then. */
 export function assertCallingHours(timeZone: string | undefined, now = new Date()) {
   if (!timeZone) throw new RailRefused("NEEDS_TIMEZONE", "Phone steps need the business's time zone (for example America/Chicago).");
   const parts = new Intl.DateTimeFormat("en-US", { timeZone, hour: "numeric", hourCycle: "h23", weekday: "short" }).formatToParts(now);
   const hour = Number(parts.find((p) => p.type === "hour")?.value);
   const day = parts.find((p) => p.type === "weekday")?.value;
-  if (day === "Sat" || day === "Sun" || hour < 9 || hour >= 18) {
-    throw new RailRefused("OUTSIDE_CALLING_HOURS", `It is ${day} ${hour}:00 for ${timeZone}. Ladder only calls businesses 9am to 6pm on weekdays, their time.`);
+  if (hour < 9 || hour >= 18) {
+    throw new RailRefused("OUTSIDE_CALLING_HOURS", `It is ${day} ${hour}:00 for ${timeZone}. Ladder only calls businesses between 9am and 6pm, their time.`);
   }
 }
 

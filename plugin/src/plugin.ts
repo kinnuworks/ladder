@@ -49,7 +49,7 @@ function createServer() {
           for_name: z.string().min(1).max(80).describe("Whose account this is, as the business knows them."),
           business_name: z.string().min(1).max(120),
           business_phone: usPhone.optional(),
-          business_timezone: z.string().min(3).max(40).optional().describe("IANA time zone of the business, e.g. America/Chicago. Needed for phone steps: Ladder calls only 9am to 6pm on weekdays, their time."),
+          business_timezone: z.string().min(3).max(40).optional().describe("IANA time zone of the business, e.g. America/Chicago. Needed for phone steps: Ladder calls only between 9am and 6pm, their time. Check the business is open before calling."),
           business_email: z.email().optional(),
           business_address: z
             .object({ line1: z.string().max(120), line2: z.string().max(120).optional(), city: z.string().max(80), state: z.string().length(2), zip: z.string().regex(/^\d{5}(-\d{4})?$/) })

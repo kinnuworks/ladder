@@ -123,11 +123,12 @@ describe("guards", () => {
     assert.doesNotThrow(() => assertNoSecrets("letter", "Account 0x1234 and reference 99812."));
   });
 
-  test("calls only on weekdays, 9am to 6pm in the business's zone", () => {
+  test("calls only between 9am and 6pm in the business's zone, any day", () => {
     const tz = "America/Chicago";
     assert.doesNotThrow(() => assertCallingHours(tz, new Date("2026-10-15T15:00:00Z"))); // Thu 10:00 CDT
     assert.throws(() => assertCallingHours(tz, new Date("2026-10-15T03:00:00Z")), (e: RailRefused) => e.code === "OUTSIDE_CALLING_HOURS"); // Wed 22:00
-    assert.throws(() => assertCallingHours(tz, new Date("2026-10-17T16:00:00Z")), (e: RailRefused) => e.code === "OUTSIDE_CALLING_HOURS"); // Saturday
+    assert.doesNotThrow(() => assertCallingHours(tz, new Date("2026-10-17T16:00:00Z"))); // Saturday 11:00 CDT
+    assert.throws(() => assertCallingHours(tz, new Date("2026-10-17T13:30:00Z")), (e: RailRefused) => e.code === "OUTSIDE_CALLING_HOURS"); // Saturday 08:30
     assert.throws(() => assertCallingHours(undefined), (e: RailRefused) => e.code === "NEEDS_TIMEZONE");
   });
 
