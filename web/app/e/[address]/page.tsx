@@ -94,16 +94,39 @@ export default async function ErrandPage({ params, searchParams }: Props) {
             {f}
           </p>
         ))}
-        {!v.deployed && (
+        {!v.deployed && !v.fundedButNotOpened && (
           <p className="notice">
-            No errand contract is deployed at this address yet. It opens when its funding payment settles.
-            {v.funded !== "0" && " USDC is already here and can only be used under the committed terms."}
+            No errand contract is deployed at this address yet. The relayer opens it in the same request that settles
+            its funding.
+          </p>
+        )}
+        {v.fundedButNotOpened && (
+          <p className="notice is-danger">
+            This address holds {v.balanceUsd} but no errand contract was ever opened here. Anyone who has the
+            errand&rsquo;s terms can call open on the factory, and then refund sends the money to the owner. The daily
+            cleanup only finds errands that were opened, so it cannot do this on its own.
           </p>
         )}
 
         {v.rungs.length > 0 && (
           <section className="app-section">
             <h2>The ladder.</h2>
+            {v.planCommitment === "matches" && (
+              <p className="notice" style={{ marginBottom: 14 }}>
+                Plan matches the on-chain commitment. Every label below belongs to a rung this errand committed to.
+              </p>
+            )}
+            {v.planCommitment === "mismatch" && (
+              <p className="notice is-danger" style={{ marginBottom: 14 }}>
+                Plan does not match the on-chain commitment. Treat these labels as wrong.
+              </p>
+            )}
+            {v.planCommitment === "unverified" && (
+              <p className="notice" style={{ marginBottom: 14 }}>
+                Labels unverified. This link does not carry each rung&rsquo;s nonce and salt
+                {v.deployed ? "" : ", or the errand is not opened yet"}, so the page cannot rebuild the committed root.
+              </p>
+            )}
             <div className="grid grid-2" style={{ alignItems: "start" }}>
               <div className="card">
                 <Ladder
