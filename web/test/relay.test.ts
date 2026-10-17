@@ -90,3 +90,12 @@ describe("finish validation", () => {
     expect(usd2(0n)).toBe("0.00");
   });
 });
+
+describe("sweep body", () => {
+  it("needs at least one sweep and an errand", async () => {
+    const { sweepBodySchema } = await import("../lib/schema");
+    const { errand } = fixture();
+    expect(sweepBodySchema.safeParse({ errand, sweeps: [] }).success).toBe(false);
+    expect(sweepBodySchema.safeParse({ sweeps: [] }).success).toBe(false);
+  });
+});

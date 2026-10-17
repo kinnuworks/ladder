@@ -20,7 +20,8 @@ Cancelling a subscription, chasing a refund, or getting a deposit back often tak
 2. **Fund, once.** `ladder_fund` proposes one x402 payment in PayBox. Before proposing, the plugin fetches the payment request itself and refuses unless the payee is exactly the errand address it computed and the amount is exactly the budget. When you approve, Ladder's relayer settles the transfer and opens the errand.
 3. **Climb.** `ladder_step` runs one step. The errand releases at most that step's cap to the step's key; USDC checks the errand's signature through ERC-1271, and the errand only approves a transfer that matches a committed step that hasn't been used. The step's key then pays the service directly over x402.
 4. **Check.** `ladder_check` reads the result: the call's transcript and recording, the person's report, or the letter's USPS Certified Mail number.
-5. **Finish.** `ladder_finish` returns anything left on the step keys and closes the errand. Ladder pays the gas. After the expiry, anyone can trigger the refund, and it can still only go to you.
+5. **Finish.** `ladder_finish` returns anything left on the step keys and closes the errand. Ladder pays the gas. If a service refuses a step, that step's money comes back to you straight away, and the letter step only ever releases the letter's exact price. After the expiry, anyone can trigger the refund, and it can still only go to you.
+6. **Refund without us.** `ladder_refund` proposes `refund()` from your own wallet. It needs no errand key and doesn't touch Ladder's server.
 
 ```
 you ──one approval──▶ errand account (Base)
@@ -39,7 +40,8 @@ you ──one approval──▶ errand account (Base)
 |---|---|
 | Money leaves only for a committed step, at most its cap, at most once | `Errand.isValidSignature` plus USDC's one-time authorization nonces |
 | Nothing can be spent after the expiry | `Errand.isValidSignature` (and every authorization must expire before the errand does) |
-| Leftover money can only go to the owner | `Errand.refund`, `refundWithSig`, `sweep` |
+| The errand's balance can only go to the owner | `Errand.refund`, `refundWithSig`, `sweep` |
+| Money a refused step didn't spend goes back to the owner | **Not the chain.** The plugin sweeps the step key through `/api/sweep`; `ladder_finish` returns anything else |
 | The errand's address matches its terms | CREATE2 in `ErrandFactory`; the plugin recomputes it before funding |
 | Escalate only when the previous step failed | **Not the chain.** The agent decides, and says why in each step call. The chain caps what a wrong decision can cost. |
 | A step's key pays the intended service | **Not the chain.** The plugin checks the service's payee and price before the key signs. A step key can spend at most its own cap. |
@@ -86,7 +88,9 @@ cd plugin && pnpm run interop
 - A certified letter takes days to arrive. The demo shows the order, its payment and its tracking number, not the delivery.
 - Ladder's relayer pays gas for funding, steps and refunds. If it is down, the owner can still call `refund()` directly, and after the expiry anyone can.
 - The contracts are not audited. The plugin caps a budget at $100.
-- The errand key in the conversation holds the errand's private keys. Anyone who gets it can spend the remaining step caps (never more), so Ladder refuses to put it in letters or call scripts and labels everything a business says as untrusted.
+- The errand key in the conversation holds the errand's private keys. Anyone who gets it can spend what the errand still holds, up to the approved budget and never from the PayBox wallet. Ladder refuses to put it in letters or call scripts and labels everything a business says as untrusted. The owner can always pull the errand's balance back with `ladder_refund`, which needs no key.
+- The agent is told to ask before moving up to the letter and to show the letter first. Ladder can't see the user's screen, so that part relies on the agent.
+- Ladder checks calling hours in code. That the AI caller stops when asked is an instruction, not a guarantee.
 
 ## Licence
 

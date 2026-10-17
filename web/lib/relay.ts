@@ -266,6 +266,30 @@ export async function relayFinish(input: {
   return { txs, refundedUsd: usd2((closed ? 0n : balance) + swept) };
 }
 
+/**
+ * Send unspent step-key money back to the owner without closing the errand. Used when a service
+ * refuses a step after its cap was released. Each sweep can only pay the owner, from a runner that
+ * received USDC from this errand, so the route needs no other auth.
+ */
+export async function relaySweeps(input: {
+  errand: Address;
+  sweeps: Sweep[];
+  findReceived: (runners: Address[]) => Promise<Set<Address>>;
+}): Promise<{ txs: Hex[]; sweptUsd: string }> {
+  const pub = publicClient();
+  const { errand, sweeps } = input;
+  if (sweeps.length === 0) throw new RelayError("Nothing to sweep.", 400);
+  const owner = getAddress(await pub.readContract({ address: errand, abi: errandAbi, functionName: "owner" }));
+  const problem = checkFinish({ owner, sweeps, received: await input.findReceived(sweeps.map((s) => s.runner)) });
+  if (problem) throw new RelayError(problem, 400);
+  const requests = await Promise.all(sweeps.map((s) => simulateTransfer(s.authorization, s.signature)));
+  const wallet = relayer();
+  const nonce = await pub.getTransactionCount({ address: wallet.account.address, blockTag: "pending" });
+  const txs: Hex[] = [];
+  for (const [i, request] of requests.entries()) txs.push(await send(request, nonce + i));
+  return { txs, sweptUsd: usd2(sweeps.reduce((sum, s) => sum + BigInt(s.authorization.value), 0n)) };
+}
+
 /** Refund one expired errand with the permissionless refund(). Used by the cron route. */
 export async function relayExpiredRefund(errand: Address): Promise<Hex> {
   const { request } = await publicClient().simulateContract({

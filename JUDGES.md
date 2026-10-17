@@ -21,21 +21,27 @@ Each claim is tagged with how you can check it.
 - **VERIFIED-LIVE**: happened on Base mainnet; the link proves it.
 - **REPRODUCIBLE**: a test in this repository proves it; the command is given.
 - **SHOWN-NOT-SPENT**: demonstrated with real services up to the point of payment, and deliberately not paid.
-- **NOT-CLAIMED**: something we say Ladder does not do.
+- **NOT-CLAIMED**: something we say Ladder does not do, or does only by instructing the agent.
+- **BY DESIGN**: follows from how the code is built; there is no separate test.
 
 | Claim | Status | Evidence |
 |---|---|---|
 | One PayBox approval funds an errand at an address fixed by its terms | VERIFIED-LIVE after the first errand; REPRODUCIBLE now | `plugin/test/interop.test.ts`; funding tx on the errand page |
 | The factory and errand code on Base match this repository | VERIFIED-LIVE | Verified source on Basescan and Sourcify for both contracts; the plugin was built with these addresses before the deploy, and the deploy script refuses to run if they would differ |
-| The plugin recomputes the errand address and refuses to fund anything else | VERIFIED-LIVE in the portal | `plugin/src/plugin.ts` (`ladder_fund`): it fetches the 402 itself and refuses on `PAYEE_MISMATCH` or `AMOUNT_MISMATCH`. PayBox\'s hosted test returned a proposal whose challenge pays exactly the computed errand address |
+| The plugin recomputes the errand address and refuses to fund anything else | VERIFIED-LIVE in the portal; REPRODUCIBLE | `fundingProblem` in `plugin/src/rails.ts`, tested in `plugin/test/steps.test.ts` (`PAYEE_MISMATCH`, `AMOUNT_MISMATCH`, no 402). PayBox's hosted test returned a proposal whose challenge pays exactly the computed errand address |
 | An errand releases money only for a committed step, at most its cap, at most once, before expiry | REPRODUCIBLE | `contracts/test/Errand.t.sol`, `contracts/test/Invariants.t.sol` (each invariant runs 128 random sequences of 64 calls), `contracts/test/Fork.t.sol` against real Base USDC |
 | Real Base USDC accepts the errand's ERC-1271 signature and rejects a forged payee or a replay | REPRODUCIBLE | `forge test --match-contract ForkTest` with `BASE_RPC_URL` set |
 | Leftover money can only go back to the owner, and after expiry anyone can trigger that | REPRODUCIBLE | `test_anyoneRefundsAfterExpiryToOwnerOnly`, `test_expiredErrandCanStillBeOpenedAndRefunded` |
-| A step key pays the service, and the service's transcript is read back by that key | VERIFIED-LIVE after the first errand | StablePhone payment and call id on the errand page |
-| The certified-letter step shows the real quote and the exact PDF before any money moves | SHOWN-NOT-SPENT | `plugin/src/rails.ts` letter branch; the quote and preview are shown in the demo only if the letter step is recorded |
-| Calls say they are automated and recorded, run 9am to 6pm in the business's time zone, and stop when asked | REPRODUCIBLE | `plugin/test/rails.test.ts` (`guards`) |
+| A step key pays the service once, and the service's transcript is read back by that key | REPRODUCIBLE; VERIFIED-LIVE after the first errand | `plugin/test/steps.test.ts` runs both calls of a step against mocked StablePhone and Base; the live payment and call id go on the errand page |
+| When a service refuses a step, its money goes straight back to the owner | REPRODUCIBLE | `plugin/test/steps.test.ts`: a wrong payee, a price over the cap or a 4xx sweeps the step key to the owner through `/api/sweep`; a 5xx keeps it for a retry. Done by the plugin, not forced by the contract |
+| The certified-letter step shows the quote and the exact PDF before any money moves, then releases only the letter's exact price | SHOWN-NOT-SPENT | `plugin/test/steps.test.ts`; PostalForm's real $14.40 quote is from unpaid drafts in `docs/RAILS.md`. No letter has been mailed |
+| The user approves the letter before it is mailed | **NOT-CLAIMED** | The agent is told to show the preview and ask; the hash makes sure the mailed letter is the one shown. Ladder can't see the user's screen |
+| Calls run only 9am to 6pm in the business's time zone | REPRODUCIBLE | `plugin/test/rails.test.ts` (`guards`), `plugin/test/steps.test.ts` |
+| Calls say they are automated and recorded, and stop when asked | **NOT-CLAIMED** as enforced | The opening line is fixed in code; stopping when asked is an instruction to the AI caller |
 | Keys can't leave in a letter or call script; service text reaches the agent labelled untrusted | REPRODUCIBLE | `assertNoSecrets`, `untrusted_service_output` in `plugin/src/plugin.ts` |
-| Each plugin call stays inside PayBox's 10-second limit, and a timeout never pays twice | BY DESIGN; VERIFIED-LIVE after the first errand | Two-call steps in `plugin/src/rails.ts`; one deadline per call |
+| A step never pays twice | REPRODUCIBLE | USDC's one-time nonces on-chain, and `plugin/test/steps.test.ts` ("an empty step key never pays twice") |
+| Each plugin call stays inside PayBox's 10-second limit | BY DESIGN | Two-call steps in `plugin/src/rails.ts`; one 8.8 s deadline per call. If a payment settles but the reply is cut off, the call id can be lost; the payment still shows on the errand page |
+| The owner can get the errand's balance back without Ladder's server | REPRODUCIBLE | `ladder_refund` proposes `refund()` from the owner's wallet; `test_ownerRefundsAnytimeAndClosesErrand` in `contracts/test/Errand.t.sol` |
 | The chain checks that a step key pays the right service | **NOT-CLAIMED** | The plugin checks the payee and price before the key signs. A step key can spend at most its own cap. |
 | The chain decides when to escalate | **NOT-CLAIMED** | The agent decides and states its reason in each step call. |
 | The contracts are audited | **NOT-CLAIMED** | Budgets are capped at $100. |
@@ -45,6 +51,10 @@ Each claim is tagged with how you can check it.
 - **Why one-time step keys, not paying services straight from the errand?** StablePhone only shows a call's transcript to the wallet that paid, and its sign-in check accepts ordinary keys only. PostalForm gives every order its own payment address. A one-time key per step keeps both working, and the errand still caps each step on-chain.
 - **Why x402 for funding?** It's one gasless approval in PayBox. The plugin checks the funding endpoint's payee before proposing, and the address is a pure function of the terms.
 - **Why a relayer?** Steps and refunds happen without the user being present, and plugins can't hold state or keys. The relayer only ever submits transactions the errand contract or a step key already authorised.
+
+## If the errand key leaks
+
+The errand key holds the errand's private keys and lives in the conversation. Whoever has it can spend what the errand still holds, up to the budget the user approved and never more, and never from the PayBox wallet. Ladder refuses to put it in a call script or a letter, labels everything a business says as untrusted, and caps budgets at $100. The owner can always call `refund()` (`ladder_refund`), which needs no key.
 
 ## What the plugin signs
 

@@ -84,6 +84,7 @@ export const finishBodySchema = z.object({
   sessionSig: hexBytes,
 });
 export type Sweep = z.infer<typeof sweepSchema>;
+export const sweepBodySchema = z.object({ errand: address, sweeps: z.array(sweepSchema).min(1).max(8) });
 
 /** Decode a `?plan=` value: base64url of the plan JSON. */
 export function decodePlanParam(value: string | undefined | null): { plan: Plan | null; error: string | null } {

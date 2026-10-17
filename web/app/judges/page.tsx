@@ -64,8 +64,8 @@ export default async function JudgesPage() {
     {
       claim: "The plugin recomputes the errand address and refuses to fund anything else.",
       tag: "REPRODUCIBLE",
-      how: "ladder_fund fetches the 402 itself and refuses unless the payee is the errand address and the amount is the budget.",
-      link: src("plugin/test/core.test.ts"),
+      how: "ladder_fund fetches the 402 itself and refuses unless the payee is the errand address and the amount is the budget. The funding-check tests cover PAYEE_MISMATCH, AMOUNT_MISMATCH and a missing 402.",
+      link: src("plugin/test/steps.test.ts"),
     },
     {
       claim: "An errand releases money only for a committed step, at most its cap, at most once, before expiry.",
@@ -84,14 +84,32 @@ export default async function JudgesPage() {
       tag: example ? "VERIFIED-LIVE" : "REPRODUCIBLE",
       how: example
         ? "On the example errand, each release is followed by the step key's payment to StablePhone."
-        : "The plugin's rail tests cover the two-call step; the live check comes with the first mainnet errand.",
-      link: exampleLink ?? src("plugin/src/rails.ts"),
+        : "The step tests run both calls against a mocked StablePhone and Base: the first releases exactly the cap to the step key, the second pays once, and an empty key never pays twice.",
+      link: exampleLink ?? src("plugin/test/steps.test.ts"),
     },
     {
-      claim: "The certified-letter step shows the real quote, about $14.40, and the exact PDF before any money moves.",
+      claim: "When a service refuses a step, that step's money goes straight back to the owner.",
+      tag: "REPRODUCIBLE",
+      how: "A wrong payee, a price over the cap or a 4xx from the service triggers a sweep of the step key to the owner. A 5xx keeps the money on the key so the step can be retried; ladder_finish returns it otherwise. This is done by the plugin, not forced by the contract.",
+      link: src("plugin/test/steps.test.ts"),
+    },
+    {
+      claim: "The certified-letter step shows the quote and the exact PDF before any money moves, then releases only the letter's exact price.",
       tag: "SHOWN-NOT-SPENT",
-      how: "PostalForm's quote and preview appear in the demo. Nothing was mailed.",
-      link: src("JUDGES.md"),
+      how: "The step tests show the preview moves no money and the approved letter releases its quoted price, not the $15 cap. PostalForm's real $14.40 quote comes from unpaid drafts recorded in docs/RAILS.md. No letter has been mailed.",
+      link: src("plugin/test/steps.test.ts"),
+    },
+    {
+      claim: "The user approves the letter before it is mailed.",
+      tag: "NOT-CLAIMED",
+      how: "The agent is told to show the preview and get approval, and the letter's hash makes sure the mailed letter is the one shown. Ladder can't see the user's screen, so this relies on the agent.",
+      link: src("plugin/src/rails.ts"),
+    },
+    {
+      claim: "Calls stop when the business asks.",
+      tag: "NOT-CLAIMED",
+      how: "The call script tells the AI caller to say it is automated and recorded, and to stop when asked. Calling hours, 9am to 6pm in the business's time zone, are enforced in code; the rest is an instruction to the caller.",
+      link: src("plugin/src/rails.ts"),
     },
     {
       claim: "The plugin and this site compute errand addresses and signatures with the same code.",

@@ -6,7 +6,9 @@ export function usd(atomic: bigint | string): string {
   const v = typeof atomic === "string" ? BigInt(atomic) : atomic;
   const s = formatUnits(v < 0n ? -v : v, 6);
   const [whole, frac = ""] = s.split(".");
-  const cents = (frac + "00").slice(0, Math.max(2, frac.replace(/0+$/, "").length));
+  // Cents, unless the amount is a fraction of a cent, which would otherwise read as $0.00.
+  const keep = v !== 0n && (v < 0n ? -v : v) < 10_000n ? frac.replace(/0+$/, "").length : 2;
+  const cents = (frac + "00").slice(0, keep);
   return `${v < 0n ? "-" : ""}$${Number(whole).toLocaleString("en-US")}.${cents}`;
 }
 

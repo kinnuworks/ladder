@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { getAddress, isAddress } from "viem";
+import Link from "next/link";
+import { type Address, getAddress, isAddress } from "viem";
 import { Addr, Tx } from "@/components/Addr";
 import { AutoRefresh } from "@/components/AutoRefresh";
 import { Ladder } from "@/components/Ladder";
+import { readConfig } from "@/lib/config";
 import { type ErrandView, loadErrandView } from "@/lib/errand";
 import { duration, short } from "@/lib/format";
 import { decodePlanParam } from "@/lib/schema";
@@ -29,6 +31,31 @@ export default async function ErrandPage({ params, searchParams }: Props) {
   if (!isAddress(address, { strict: false })) notFound();
   const sp = await searchParams;
   const { plan, error } = decodePlanParam(typeof sp.plan === "string" ? sp.plan : undefined);
+
+  const cfg = readConfig();
+  const contracts: [string, Address | null][] = [
+    ["ErrandFactory", cfg.factory],
+    ["Errand implementation", cfg.implementation],
+  ];
+  const known = contracts.find(([, a]) => a?.toLowerCase() === address.toLowerCase()) as [string, Address] | undefined;
+  if (known) {
+    return (
+      <main className="page app">
+        <div className="container">
+          <h1>{known[0]}.</h1>
+          <p className="mono" style={{ marginTop: 12 }}>
+            <Addr a={known[1]} full />
+          </p>
+          <p className="notice">
+            This is one of Ladder&rsquo;s contracts, not an errand. Its source is verified on Basescan.{" "}
+            <Link className="link" href="/judges">
+              See the contracts
+            </Link>
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   let v: ErrandView;
   try {
@@ -100,7 +127,13 @@ export default async function ErrandPage({ params, searchParams }: Props) {
             its funding.
           </p>
         )}
-        {v.fundedButNotOpened && (
+        {v.fundedButNotOpened && !v.plan && (
+          <p className="notice">
+            No Ladder errand has been opened at this address. If you planned an errand here, open its page from the
+            link your agent gave you, which carries the plan.
+          </p>
+        )}
+        {v.fundedButNotOpened && v.plan && (
           <p className="notice is-danger">
             This address holds {v.balanceUsd} but no errand contract was ever opened here. Anyone who has the
             errand&rsquo;s terms can call open on the factory, and then refund sends the money to the owner. The daily

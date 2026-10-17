@@ -51,7 +51,15 @@ const FAQ = [
   },
   {
     q: "What happens to money a step key did not spend?",
-    a: "The agent sends it back to your wallet when it finishes. A step key is held by the agent, so the contract cannot force that return, which is why each release is capped at the step's price.",
+    a: "If a service refuses a step, Ladder sends that step's money straight back to your wallet. The letter step releases the letter's exact price, so nothing is left on it. Anything else comes back when the agent finishes the errand. Step keys are held by the agent, so this return is done by the plugin, not forced by the contract.",
+  },
+  {
+    q: "What if someone gets hold of the errand key?",
+    a: "The errand key holds the errand's private keys, and it lives in your conversation. Whoever has it could spend what the errand still holds, up to the budget you approved and never more. It can't touch your PayBox wallet. Ladder refuses to put it in a call script or a letter, and treats everything a business says as untrusted.",
+  },
+  {
+    q: "What if Ladder's site goes down?",
+    a: "Ask your agent to use ladder_refund. Your own wallet calls refund() on the errand, which sends its balance back to you. It needs no errand key and doesn't go through this site. After the expiry, anyone can trigger that refund, and it still only pays you.",
   },
   {
     q: "Is there a limit on the budget?",
@@ -84,11 +92,11 @@ export default function Home() {
             Built for PayBox
           </span>
           <h1>
-            Get a real errand <em className="t-serif">done</em> with one approval.
+            Your AI makes the call. You approve <em className="t-serif">once</em>.
           </h1>
           <p className="lead">
-            Tell your AI what you need and how much it may spend. It calls the business, calls again if needed, then
-            sends a certified letter. Money it does not use comes back to you.
+            Tell your AI what you need from a business and the most it may spend. It calls them, calls again if it has
+            to, and mails a certified letter if they insist on writing. What it doesn't spend comes back to you.
           </p>
           <div className="cta-row">
             <a className="btn btn-candy btn-lg" href={add}>
@@ -101,7 +109,7 @@ export default function Home() {
           <div className="trust">
             <span>One approval</span>
             <span>Caps enforced on Base</span>
-            <span>Leftover refunded to you</span>
+            <span>Unspent money back to you</span>
           </div>
 
           <div className="hero__visual bleed">
@@ -217,7 +225,8 @@ export default function Home() {
             <div className="card card--flat card--chosen reveal" style={{ ["--i" as string]: 1 }}>
               <h3 className="t-title">With Ladder</h3>
               <p className="t-small" style={{ marginTop: 8 }}>
-                You approve one payment and the agent works up the steps you agreed to. {SAFETY}
+                You approve one payment for the whole plan. The agent works up the steps you agreed to, and each step
+                can spend at most its own cap, once. If the first call settles it, the rest comes back to you.
               </p>
             </div>
           </div>
@@ -269,8 +278,9 @@ export default function Home() {
                   [
                     ["Send each step's cap only to that step's one-time key", "chain"],
                     ["Each step at most once, before the expiry", "chain"],
-                    ["Refunds only to your wallet", "chain"],
+                    ["The errand's balance refunds only to your wallet", "chain"],
                     ["The service's address and price before a step key pays", "plugin"],
+                    ["Money a refused step didn't spend goes back to you", "plugin"],
                     ["What to say on the call", "agent"],
                     ["When to move up a rung", "agent"],
                   ] as const

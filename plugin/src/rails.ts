@@ -73,6 +73,35 @@ async function post(path: string, body: unknown, dl: Deadline) {
   return j;
 }
 
+// --- funding ------------------------------------------------------------------
+
+/** Checks the funding endpoint's 402 before the plugin proposes it: the payee must be exactly the
+ *  errand computed from the terms, and the amount exactly the budget. Returns null when it is safe. */
+export function fundingProblem(
+  probe: { status: number; headers: Headers; body: any },
+  errand: Address,
+  budget: string,
+): { code: "NO_CHALLENGE" | "PAYEE_MISMATCH" | "AMOUNT_MISMATCH"; reason: string } | null {
+  const header = probe.headers.get("payment-required");
+  let pr: any = probe.body;
+  try {
+    if (header) pr = JSON.parse(Buffer.from(header, "base64").toString());
+  } catch {
+    pr = null;
+  }
+  const req = (pr?.accepts ?? []).find((x: any) => x?.scheme === "exact");
+  if (probe.status !== 402 || !req) return { code: "NO_CHALLENGE", reason: "The funding endpoint did not return a payment request." };
+  let payTo: Address | null = null;
+  try {
+    payTo = getAddress(req.payTo);
+  } catch {
+    // reported below
+  }
+  if (payTo !== errand) return { code: "PAYEE_MISMATCH", reason: `The funding request pays ${req.payTo}, not the errand ${errand}.` };
+  if (String(req.amount ?? req.maxAmountRequired) !== budget) return { code: "AMOUNT_MISMATCH", reason: "The funding amount differs from the budget." };
+  return null;
+}
+
 // --- guards ------------------------------------------------------------------
 
 const SECRET = /ldr1_|(?:0x)?[0-9a-fA-F]{64}/;
@@ -177,12 +206,39 @@ export interface StepResult {
   untrusted?: unknown;
 }
 
-/** Call 1: move the step's cap from the errand to the step's key. */
-async function releaseCap(d: Decoded, i: number, dl: Deadline): Promise<string> {
+/** Call 1: move the step's cap (or, for the letter, its exact price) from the errand to the step's key. */
+async function releaseCap(d: Decoded, i: number, dl: Deadline, value?: bigint): Promise<string> {
   const rung = d.rungs[i]!;
   const validBefore = BigInt(Math.min(Math.floor(Date.now() / 1000) + 300, d.key.terms.expiry - 1));
-  const { authorization, signature } = await signRungPayment({ errand: d.errand, rung, proof: d.proofs[i]!, value: rung.max, validBefore, sessionKey: d.key.sessionKey });
+  const { authorization, signature } = await signRungPayment({ errand: d.errand, rung, proof: d.proofs[i]!, value: value ?? rung.max, validBefore, sessionKey: d.key.sessionKey });
   return String((await post("/api/move", { errand: d.errand, authorization, signature }, dl)).tx);
+}
+
+/** Refusals that will not change on a retry. After one of these, the step's money goes straight back
+ *  to the owner instead of waiting on the step key for ladder_finish. */
+const FINAL_REFUSAL = /^(UNEXPECTED_PAYEE|OVER_STEP_CAP|PAYEE_MISMATCH|NO_BASE_USDC_OPTION|PAYMENT_REJECTED|SERVICE_4(?!08|29)\d\d)$/;
+
+/** Send everything on a step key back to the owner, leaving the errand open. */
+export async function sweepStep(d: Decoded, rung: Rung, dl: Deadline): Promise<{ usd: string; tx: string } | null> {
+  const balance = await usdcBalance(rung.to, dl);
+  if (balance === 0n) return null;
+  const validBefore = BigInt(Math.floor(Date.now() / 1000) + 300);
+  const { authorization, signature } = await signAsRunner(rung.runnerKey, d.key.terms.owner, balance, validBefore);
+  const r = await post("/api/sweep", { errand: d.errand, sweeps: [{ runner: rung.to, authorization, signature }] }, dl);
+  return { usd: (Number(balance) / 1e6).toFixed(2), tx: String(r.txs?.[0] ?? "") };
+}
+
+async function returnOnRefusal<T>(d: Decoded, rung: Rung, dl: Deadline, work: () => Promise<T>): Promise<T> {
+  try {
+    return await work();
+  } catch (e) {
+    if (!(e instanceof RailRefused) || !FINAL_REFUSAL.test(e.code)) throw e;
+    const back = await sweepStep(d, rung, dl).catch(() => null);
+    throw new RailRefused(
+      e.code,
+      `${e.message} ${back ? `The step's $${back.usd} went back to the owner's wallet (transaction ${back.tx}). This step is now used; move to the next one or finish.` : "The step's money is still on its one-time key; ladder_finish sends it back to the owner."}`,
+    );
+  }
 }
 
 function stepBody(d: Decoded, i: number, reason: string) {
@@ -242,23 +298,28 @@ export async function runRung(
         detail: { release_tx: tx, step_key: rung.to },
       };
     }
-    const challenge = await probe(url, "POST", body, dl.left(3500));
-    if (runnerBalance < BigInt(challenge.requirement.amount)) {
-      throw new RailRefused(
-        "ALREADY_PAID_OR_CONFIRMING",
-        `This step's key holds $${(Number(runnerBalance) / 1e6).toFixed(2)}, less than the $${(Number(challenge.requirement.amount) / 1e6).toFixed(2)} this costs. Either the step was already paid (check it with ladder_check using its job id, or see the step key ${rung.to} on the errand page), or its release is still confirming: wait a few seconds and run it again. Nothing new was paid.`,
-      );
-    }
-    const res = await payAsRunner({ url, method: "POST", body, challenge, expect: { payTo: RAILS[rung.rail].payTo, maxAmount: runnerBalance }, runnerKey: rung.runnerKey, timeoutMs: dl.left(8000) });
-    if (res.status >= 400) throw new RailRefused(`SERVICE_${res.status}`, `${RAILS[rung.rail].name} refused the request and did not charge: ${JSON.stringify(res.body).slice(0, 300)}`);
-    return {
-      status: "started",
-      jobId: jobId(res.body),
-      paid: { amount: res.amount.toString(), transaction: res.transaction },
-      next: rung.rail === "phone" ? "Check the call with ladder_check in a few minutes." : `A person will email the report to ${brief.replyEmail}.`,
-      detail: { step_key: rung.to },
-      untrusted: res.body,
-    };
+    return returnOnRefusal(d, rung, dl, async () => {
+      const challenge = await probe(url, "POST", body, dl.left(3500));
+      if (BigInt(challenge.requirement.amount) > rung.max) {
+        throw new RailRefused("OVER_STEP_CAP", `${RAILS[rung.rail].name} now asks $${(Number(challenge.requirement.amount) / 1e6).toFixed(2)}; this step is capped at $${(Number(rung.max) / 1e6).toFixed(2)}. Nothing was paid.`);
+      }
+      if (runnerBalance < BigInt(challenge.requirement.amount)) {
+        throw new RailRefused(
+          "ALREADY_PAID_OR_CONFIRMING",
+          `This step's key holds $${(Number(runnerBalance) / 1e6).toFixed(2)}, less than the $${(Number(challenge.requirement.amount) / 1e6).toFixed(2)} this costs. Either the step was already paid (check it with ladder_check using its job id, or see the step key ${rung.to} on the errand page), or its release is still confirming: wait a few seconds and run it again. Nothing new was paid.`,
+        );
+      }
+      const res = await payAsRunner({ url, method: "POST", body, challenge, expect: { payTo: RAILS[rung.rail].payTo, maxAmount: runnerBalance }, runnerKey: rung.runnerKey, timeoutMs: dl.left(8000) });
+      if (res.status >= 400) throw new RailRefused(`SERVICE_${res.status}`, `${RAILS[rung.rail].name} refused the request and did not charge: ${JSON.stringify(res.body).slice(0, 300)}`);
+      return {
+        status: "started",
+        jobId: jobId(res.body),
+        paid: { amount: res.amount.toString(), transaction: res.transaction },
+        next: rung.rail === "phone" ? "Check the call with ladder_check in a few minutes." : `A person will email the report to ${brief.replyEmail}.`,
+        detail: { step_key: rung.to },
+        untrusted: res.body,
+      };
+    });
   }
 
   // Certified letter.
@@ -291,7 +352,11 @@ export async function runRung(
     throw new RailRefused("LETTER_CHANGED", "This is not the letter the user approved. Show the new preview and get approval again.");
   }
   if (!released) {
-    const tx = await releaseCap(d, d.index, dl);
+    // Release the letter's exact price, read from its (idempotent) draft order, so nothing is left over.
+    const quoted = await readChallenge(await fetchWithTimeout(POSTALFORM, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(order) }, dl.left(3500)));
+    const price = BigInt(quoted.requirement.amount);
+    if (price > rung.max) throw new RailRefused("OVER_STEP_CAP", `The letter costs $${(Number(price) / 1e6).toFixed(2)}; this step is capped at $${(Number(rung.max) / 1e6).toFixed(2)}. Nothing was released.`);
+    const tx = await releaseCap(d, d.index, dl, price);
     return {
       status: "released",
       jobId: "",
@@ -300,26 +365,28 @@ export async function runRung(
       detail: { release_tx: tx, step_key: rung.to, letter_sha256: hash },
     };
   }
-  const draft = await fetchWithTimeout(POSTALFORM, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(order) }, dl.left(3000));
-  const challenge: Challenge = await readChallenge(draft);
-  const orderId = String(challenge.body.order_id ?? order.request_id);
-  // PostalForm gives each order its own deposit address; check it against the order's public status.
-  const status = (await (await fetchWithTimeout(`${POSTALFORM}/${orderId}`, { headers: { accept: "application/json" } }, dl.left(2500))).json()) as any;
-  const orderPayTo = status?.x402?.pay_to ? getAddress(status.x402.pay_to) : undefined;
-  if (!orderPayTo || getAddress(challenge.requirement.payTo) !== orderPayTo) throw new RailRefused("PAYEE_MISMATCH", "PostalForm's payment address does not match the order's own status.");
-  if (runnerBalance < BigInt(challenge.requirement.amount)) {
-    throw new RailRefused("ALREADY_PAID_OR_CONFIRMING", `This step's key holds less than the letter costs. Either the letter was already paid (check it with ladder_check and job id ${orderId}), or its release is still confirming: wait a few seconds and run it again. Nothing new was paid.`);
-  }
-  const res = await payAsRunner({ url: POSTALFORM, method: "POST", body: order, challenge, expect: { payTo: orderPayTo, maxAmount: runnerBalance }, runnerKey: rung.runnerKey, timeoutMs: dl.left(6000) });
-  if (res.status >= 400) throw new RailRefused(`SERVICE_${res.status}`, `PostalForm refused the order: ${JSON.stringify(res.body).slice(0, 300)}`);
-  return {
-    status: "started",
-    jobId: orderId,
-    paid: { amount: res.amount.toString(), transaction: res.transaction },
-    next: "Check the letter with ladder_check; the USPS Certified Mail number appears once it is printed.",
-    detail: { step_key: rung.to, letter_sha256: hash },
-    untrusted: { status: res.body?.status ?? null },
-  };
+  return returnOnRefusal(d, rung, dl, async () => {
+    const draft = await fetchWithTimeout(POSTALFORM, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(order) }, dl.left(3000));
+    const challenge: Challenge = await readChallenge(draft);
+    const orderId = String(challenge.body.order_id ?? order.request_id);
+    // PostalForm gives each order its own deposit address; check it against the order's public status.
+    const status = (await (await fetchWithTimeout(`${POSTALFORM}/${orderId}`, { headers: { accept: "application/json" } }, dl.left(2500))).json()) as any;
+    const orderPayTo = status?.x402?.pay_to ? getAddress(status.x402.pay_to) : undefined;
+    if (!orderPayTo || getAddress(challenge.requirement.payTo) !== orderPayTo) throw new RailRefused("PAYEE_MISMATCH", "PostalForm's payment address does not match the order's own status.");
+    if (runnerBalance < BigInt(challenge.requirement.amount)) {
+      throw new RailRefused("ALREADY_PAID_OR_CONFIRMING", `This step's key holds less than the letter costs. Either the letter was already paid (check it with ladder_check and job id ${orderId}), or its release is still confirming: wait a few seconds and run it again. Nothing new was paid.`);
+    }
+    const res = await payAsRunner({ url: POSTALFORM, method: "POST", body: order, challenge, expect: { payTo: orderPayTo, maxAmount: runnerBalance }, runnerKey: rung.runnerKey, timeoutMs: dl.left(6000) });
+    if (res.status >= 400) throw new RailRefused(`SERVICE_${res.status}`, `PostalForm refused the order: ${JSON.stringify(res.body).slice(0, 300)}`);
+    return {
+      status: "started",
+      jobId: orderId,
+      paid: { amount: res.amount.toString(), transaction: res.transaction },
+      next: "Check the letter with ladder_check; the USPS Certified Mail number appears once it is printed.",
+      detail: { step_key: rung.to, letter_sha256: hash },
+      untrusted: { status: res.body?.status ?? null },
+    };
+  });
 }
 
 export async function readRung(d: Decoded & { index: number; jobId: string }) {
