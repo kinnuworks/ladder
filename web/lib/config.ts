@@ -18,6 +18,9 @@ function addr(v: string | undefined): Address | null {
   return v && isAddress(v, { strict: false }) ? getAddress(v) : null;
 }
 
+/** The public source repository. */
+export const REPO_DEFAULT = "https://github.com/kinnuworks/ladder";
+
 export function readConfig(env: Record<string, string | undefined> = process.env): PublicConfig {
   const block = env.DEPLOY_BLOCK?.trim();
   return {
@@ -28,7 +31,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     publicUrl: env.PUBLIC_URL?.trim().replace(/\/+$/, "") || null,
     exampleErrand: addr(env.EXAMPLE_ERRAND?.trim()),
     examplePlan: env.EXAMPLE_PLAN?.trim() || null,
-    repoUrl: env.REPO_URL?.trim().replace(/\/+$/, "") || null,
+    repoUrl: env.REPO_URL?.trim().replace(/\/+$/, "") || REPO_DEFAULT,
     payboxInstallUrl: env.PAYBOX_INSTALL_URL?.trim() || null,
   };
 }
@@ -53,9 +56,7 @@ export function requireConfig(cfg = readConfig()) {
   return cfg as PublicConfig & { factory: Address; implementation: Address; rpcUrl: string; publicUrl: string };
 }
 
-/** Where "Add to PayBox" points: the configured install link, else the plugin's source, else the page section. */
+/** Where "Add to PayBox" points: PAYBOX_INSTALL_URL when set, else the install section of the README. */
 export function installUrl(cfg: PublicConfig): string {
-  if (cfg.payboxInstallUrl) return cfg.payboxInstallUrl;
-  if (cfg.repoUrl) return `${cfg.repoUrl}/tree/HEAD/plugin`;
-  return "/#add";
+  return cfg.payboxInstallUrl ?? `${REPO_DEFAULT}#install`;
 }

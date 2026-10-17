@@ -2,6 +2,10 @@
 // It does nothing unless CRON_SECRET is set and matches. It only refunds errands that have
 // expired, are still open and hold USDC; refund() then sends that USDC to each errand's owner.
 // Each run handles at most a few errands and counts against the relayer's transaction caps.
+// It finds errands through the factory's ErrandOpened events, so USDC sent to an address whose
+// errand was never opened is out of its reach. That case needs someone with the terms to call
+// factory.open first; /api/fund avoids it by refusing to fund unless the factory is deployed and
+// opening the errand in the same request.
 import { type Address, getAddress } from "viem";
 import { USDC } from "@/lib/core";
 import { errandAbi, factoryAbi, publicClient, usdcAbi } from "@/lib/chain";
