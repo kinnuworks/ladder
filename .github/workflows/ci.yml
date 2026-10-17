@@ -1,0 +1,63 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: contracts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: foundry-rs/foundry-toolchain@v1
+      - run: forge fmt --check
+      - run: forge build --sizes
+      - name: unit, fuzz and invariant tests
+        run: FOUNDRY_PROFILE=ci forge test -vv --no-match-contract ForkTest
+      - name: fork tests against Base USDC
+        env:
+          BASE_RPC_URL: https://mainnet.base.org
+        run: forge test -vv --match-contract ForkTest
+
+  plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+          cache: pnpm
+          cache-dependency-path: plugin/pnpm-lock.yaml
+      - run: pnpm install --frozen-lockfile
+      - name: unit tests
+        run: pnpm run unit
+      - name: PayBox conformance (typecheck, two byte-identical builds, protocol checks)
+        run: pnpm test
+
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.11.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.21.0
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run typecheck
+      - run: pnpm test
