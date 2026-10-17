@@ -276,7 +276,67 @@ export async function logsAdaptive<T>(from: bigint, to: bigint, fetch: (from: bi
 
 const transferEvent = usdcAbi.find((x) => x.type === "event" && x.name === "Transfer")!;
 
+/** True when the RPC is an Alchemy endpoint, which offers a transfers index (its free plan caps getLogs at 10 blocks). */
+function usesAlchemy(): boolean {
+  return /\.alchemy\.com\//.test(readConfig().rpcUrl ?? "");
+}
+
+interface AlchemyTransfer {
+  hash: string;
+  from: string;
+  to: string;
+  blockNum: string;
+  uniqueId: string;
+  rawContract: { value: string };
+}
+
+/** USDC transfers from Alchemy's transfers index, paged, for one sender or recipient. */
+async function alchemyTransfers(args: { from?: Address; to?: Address }, fromBlock: bigint, toBlock: bigint): Promise<TransferLog[]> {
+  const url = readConfig().rpcUrl!;
+  const out: TransferLog[] = [];
+  let pageKey: string | undefined;
+  for (let page = 0; page < 10; page++) {
+    const params = {
+      fromBlock: `0x${fromBlock.toString(16)}`,
+      toBlock: `0x${toBlock.toString(16)}`,
+      ...(args.from ? { fromAddress: args.from } : {}),
+      ...(args.to ? { toAddress: args.to } : {}),
+      contractAddresses: [USDC],
+      category: ["erc20"],
+      excludeZeroValue: false,
+      maxCount: "0x3e8",
+      ...(pageKey ? { pageKey } : {}),
+    };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "alchemy_getAssetTransfers", params: [params] }),
+      cache: "no-store",
+    });
+    const j = (await res.json()) as { result?: { transfers: AlchemyTransfer[]; pageKey?: string }; error?: { message: string } };
+    if (j.error || !j.result) throw new Error(j.error?.message ?? "transfers index unavailable");
+    for (const t of j.result.transfers) {
+      out.push({
+        from: getAddress(t.from),
+        to: getAddress(t.to),
+        value: BigInt(t.rawContract.value),
+        tx: t.hash as Hex,
+        block: BigInt(t.blockNum),
+        logIndex: Number(t.uniqueId.split(":").pop() ?? 0),
+      });
+    }
+    pageKey = j.result.pageKey;
+    if (!pageKey) break;
+  }
+  return out;
+}
+
 async function transfers(args: { from?: Address; to?: Address | Address[] }, fromBlock: bigint, toBlock: bigint): Promise<TransferLog[]> {
+  if (usesAlchemy()) {
+    const tos = Array.isArray(args.to) ? args.to : args.to ? [args.to] : [undefined];
+    const all = await Promise.all(tos.map((to) => alchemyTransfers({ from: args.from, to }, fromBlock, toBlock)));
+    return all.flat().sort(order);
+  }
   const pub = publicClient();
   const logs = await logsAdaptive(fromBlock, toBlock, (f, t) =>
     pub.getLogs({ address: USDC, event: transferEvent, args, fromBlock: f, toBlock: t, strict: true }),
@@ -340,20 +400,26 @@ export async function readErrand(address: Address, plan: Plan | null, planError:
     runners.length
       ? Promise.all(runners.map((r) => transfers({ from: r }, fromBlock, latestBlock))).then((x) => x.flat().sort(order))
       : Promise.resolve([]),
-    state && cfg.factory
-      ? logsAdaptive(fromBlock, latestBlock, (f, t) =>
-          pub.getLogs({
-            address: cfg.factory!,
-            event: factoryAbi.find((x) => x.type === "event" && x.name === "ErrandOpened")!,
-            args: { errand: address },
-            fromBlock: f,
-            toBlock: t,
-          }),
-        ).then((l) => (l[0] ? { tx: l[0].transactionHash as Hex, block: l[0].blockNumber as bigint } : null))
-      : Promise.resolve(null),
+    Promise.resolve(null),
   ]);
 
-  return { address, now, latestBlock, latestTime, state, balance, opened, transfersIn, transfersOut, runnerTransfers, plan, planError };
+  // The relayer opens an errand right after funding it, so its ErrandOpened event sits a few blocks after the first deposit.
+  let openedAt = opened as { tx: Hex; block: bigint } | null;
+  const firstIn = transfersIn[0];
+  if (state && cfg.factory && firstIn) {
+    const logs = await pub
+      .getLogs({
+        address: cfg.factory,
+        event: factoryAbi.find((x) => x.type === "event" && x.name === "ErrandOpened")!,
+        args: { errand: address },
+        fromBlock: firstIn.block,
+        toBlock: firstIn.block + 9n > latestBlock ? latestBlock : firstIn.block + 9n,
+      })
+      .catch(() => []);
+    if (logs[0]) openedAt = { tx: logs[0].transactionHash as Hex, block: logs[0].blockNumber as bigint };
+  }
+
+  return { address, now, latestBlock, latestTime, state, balance, opened: openedAt, transfersIn, transfersOut, runnerTransfers, plan, planError };
 }
 
 /** JSON-safe view (bigints are already strings in ErrandView). */
