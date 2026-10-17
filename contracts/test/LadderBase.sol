@@ -27,6 +27,8 @@ abstract contract LadderBase is Test {
     uint256 sessionKey = 0xA11CE;
     address sessionSigner;
 
+    // In production each rung pays a one-time step key, which then pays the service. The contract
+    // treats every rung payee the same way, so these tests use fixed addresses as stand-in payees.
     address constant PHONE = address(0xD219dB8179Bb9C1899eF87f39eebA9D1070c6801);
     address constant HUMAN = address(0x4603366F72023572b139D19e354e9FA3A50c634B);
     address constant MAIL = address(0x3Ea31dE08708a6eb65f345719E6B1CdB72df0406);

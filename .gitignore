@@ -8,3 +8,4 @@ contracts/broadcast/*/31337/
 plugin/dist/
 .vercel/
 .DS_Store
+contracts/broadcast/

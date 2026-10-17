@@ -162,11 +162,11 @@ export async function payAsRunner(input: {
 }
 
 /** Probe a paid endpoint with the real request and return its challenge. */
-export async function probe(url: string, method: "GET" | "POST", body?: unknown): Promise<Challenge> {
+export async function probe(url: string, method: "GET" | "POST", body?: unknown, timeoutMs = 4000): Promise<Challenge> {
   const res = await fetchWithTimeout(
     url,
     { method, headers: { "content-type": "application/json", accept: "application/json" }, body: body === undefined ? undefined : JSON.stringify(body) },
-    4000,
+    timeoutMs,
   );
   if (res.status !== 402) {
     const text = await res.text().catch(() => "");

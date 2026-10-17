@@ -93,7 +93,7 @@ export interface ErrandView {
   openTx: Hex | null;
   openTxUrl: string | null;
   timeline: Row[];
-  plan: { goal: string | null; business: string | null } | null;
+  plan: { business: string | null } | null;
   rungs: RungView[];
   planIssues: string[];
   flags: string[];
@@ -247,7 +247,7 @@ export function shapeErrand(raw: RawErrand): ErrandView {
     openTx: raw.opened?.tx ?? null,
     openTxUrl: raw.opened ? txUrl(raw.opened.tx) : null,
     timeline: rows,
-    plan: plan ? { goal: plan.goal, business: plan.business } : null,
+    plan: plan ? { business: plan.business } : null,
     rungs,
     planIssues,
     flags,

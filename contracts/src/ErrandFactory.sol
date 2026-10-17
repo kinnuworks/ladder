@@ -15,8 +15,6 @@ contract ErrandFactory {
         address indexed errand, address indexed owner, address sessionSigner, uint64 expiry, bytes32 rungsRoot
     );
 
-    error ExpiryInPast();
-
     constructor(IERC20 usdc) {
         implementation = new Errand(usdc);
     }
@@ -41,11 +39,12 @@ contract ErrandFactory {
 
     /// @notice Deploy the errand for these terms. Permissionless and idempotent in effect:
     ///         the terms fix the address, so a second caller can only deploy the same thing.
+    ///         Opening after the expiry is allowed on purpose: an expired errand can pay nothing,
+    ///         but opening it lets anyone return money that was sent to its address to the owner.
     function open(address owner, address sessionSigner, uint64 expiry, bytes32 rungsRoot)
         external
         returns (Errand errand)
     {
-        if (expiry <= block.timestamp) revert ExpiryInPast();
         address predicted = predict(owner, sessionSigner, expiry, rungsRoot);
         if (predicted.code.length > 0) return Errand(predicted);
         errand =

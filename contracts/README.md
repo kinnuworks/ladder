@@ -1,66 +1,9 @@
-## Foundry
+# Ladder contracts
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+`ErrandFactory` deploys `Errand` accounts at CREATE2 addresses fixed by their terms: owner, session signer, expiry and a Merkle root of steps. An errand answers ERC-1271 `isValidSignature` only for a USDC `transferWithAuthorization` that matches a committed step: the committed payee, at most its cap, with its one-time nonce, before the expiry, signed by the errand's session key. Every refund path pays only the owner.
 
-Foundry consists of:
-
-- **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
-- **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
-- **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
-- **Chisel**: Fast, utilitarian, and verbose solidity REPL.
-
-## Documentation
-
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
-```
-
-### Test
-
-```shell
-$ forge test
-```
-
-### Format
-
-```shell
-$ forge fmt
-```
-
-### Gas Snapshots
-
-```shell
-$ forge snapshot
-```
-
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
+```bash
+forge test                                           # unit, fuzz and invariant tests (fork tests skip)
+BASE_RPC_URL=https://mainnet.base.org forge test     # adds fork tests against real Base USDC
+forge script script/Deploy.s.sol --rpc-url $BASE_RPC_URL --broadcast --private-key $RELAYER_PRIVATE_KEY
 ```

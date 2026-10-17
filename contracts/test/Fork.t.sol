@@ -16,7 +16,10 @@ contract ForkTest is LadderBase {
 
     function setUp() public {
         string memory rpc = vm.envOr("BASE_RPC_URL", string(""));
-        if (bytes(rpc).length == 0) return;
+        if (bytes(rpc).length == 0) {
+            vm.skip(true);
+            return;
+        }
         vm.createSelectFork(rpc);
         live = true;
         token = USDC;

@@ -43,9 +43,22 @@ contract ErrandTest is LadderBase {
         impl.initialize(owner, sessionSigner, expiry, root);
     }
 
-    function test_cannotOpenExpired() public {
-        vm.expectRevert(ErrandFactory.ExpiryInPast.selector);
-        factory.open(owner, sessionSigner, uint64(block.timestamp), root);
+    function test_expiredErrandCanStillBeOpenedAndRefunded() public {
+        uint64 past = uint64(block.timestamp + 1);
+        address predicted = factory.predict(owner, sessionSigner, past, root);
+        usdc.mint(predicted, 7_000_000);
+        vm.warp(past + 30 days);
+        Errand late = factory.open(owner, sessionSigner, past, root);
+        assertEq(_checkOn(late, 0, rungs[0].to, 1), bytes4(0xffffffff));
+        vm.prank(makeAddr("anyone"));
+        late.refund();
+        assertEq(usdc.balanceOf(owner), 7_000_000);
+    }
+
+    function _checkOn(Errand e, uint256 i, address to, uint256 value) internal view returns (bytes4) {
+        uint256 validBefore = block.timestamp + 300;
+        bytes memory sig = _authSig(e, i, to, value, validBefore, sessionKey);
+        return e.isValidSignature(e.authorizationDigest(to, value, 0, validBefore, rungs[i].nonce), sig);
     }
 
     function test_termsFixTheAddress() public view {

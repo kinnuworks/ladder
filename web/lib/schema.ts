@@ -41,26 +41,14 @@ export const planRungSchema = z.object({
   max: uintString,
 });
 
-/**
- * The public part of a plan. The plugin sends `{ brief, rungs }`; only the goal and the business
- * name are kept from the brief. Unknown fields (contact details, return address) are dropped.
- */
+/** The public plan the plugin sends: the business name and the committed rungs. No goal, no contact details. */
 export const planSchema = z
   .object({
-    brief: z
-      .object({ goal: z.string().max(500).optional(), business: z.object({ name: z.string().max(200).optional() }).optional() })
-      .optional(),
-    goal: z.string().max(500).optional(),
     business: z.string().max(200).optional(),
     errand: address.optional(),
     rungs: z.array(planRungSchema).min(1).max(16),
   })
-  .transform((p) => ({
-    goal: p.goal ?? p.brief?.goal ?? null,
-    business: p.business ?? p.brief?.business?.name ?? null,
-    ...(p.errand ? { errand: p.errand } : {}),
-    rungs: p.rungs,
-  }));
+  .transform((p) => ({ business: p.business ?? null, ...(p.errand ? { errand: p.errand } : {}), rungs: p.rungs }));
 
 export type Plan = z.output<typeof planSchema>;
 export type PlanRung = Plan["rungs"][number];
@@ -86,12 +74,13 @@ export type ParsedAuthorization = z.infer<typeof authorizationSchema>;
 
 export const refundBodySchema = z.object({ errand: address, sessionSig: hexBytes });
 export const moveBodySchema = z.object({ errand: address, authorization: authorizationSchema, signature: hexBytes });
-export const sweepBodySchema = z.object({
+export const sweepSchema = z.object({ runner: address, authorization: authorizationSchema, signature: hexBytes });
+export const finishBodySchema = z.object({
   errand: address,
-  runner: address,
-  authorization: authorizationSchema,
-  signature: hexBytes,
+  sweeps: z.array(sweepSchema).max(16).default([]),
+  sessionSig: hexBytes,
 });
+export type Sweep = z.infer<typeof sweepSchema>;
 
 /** Decode a `?plan=` value: base64url of the plan JSON. */
 export function decodePlanParam(value: string | undefined | null): { plan: Plan | null; error: string | null } {
@@ -106,10 +95,9 @@ export function decodePlanParam(value: string | undefined | null): { plan: Plan 
   }
 }
 
-/** The public plan for a `?plan=` link: goal, business name and the rungs. */
+/** The public plan for an opt-in `?plan=` link: business name and the rungs. */
 export function encodePlanParam(plan: Plan): string {
   const pub = {
-    ...(plan.goal ? { goal: plan.goal } : {}),
     ...(plan.business ? { business: plan.business } : {}),
     ...(plan.errand ? { errand: plan.errand } : {}),
     rungs: plan.rungs,

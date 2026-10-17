@@ -4,6 +4,7 @@ import { predictErrand, type Terms } from "./core";
 import { type FundBody, type Plan, fundBodySchema, firstIssue, planRungIssues } from "./schema";
 
 export const MAX_BUDGET = 100_000_000n; // 100 USDC
+export const MIN_BUDGET = 1_000_000n; // 1 USDC
 export const MAX_EXPIRY_SECONDS = 30 * 86_400;
 /** An errand must have at least this long left, or factory.open could revert during settlement. */
 export const MIN_EXPIRY_SECONDS = 600;
@@ -30,6 +31,7 @@ export function checkFundRequest(
   if (terms.expiry <= nowSeconds + MIN_EXPIRY_SECONDS) return { ok: false, status: 400, message: "The errand expiry is in the past or too close." };
   if (terms.expiry > nowSeconds + MAX_EXPIRY_SECONDS) return { ok: false, status: 400, message: "The errand expiry is more than 30 days out." };
   if (budget > MAX_BUDGET) return { ok: false, status: 400, message: "The budget is over 100 USDC." };
+  if (budget < MIN_BUDGET) return { ok: false, status: 400, message: "The budget is under 1 USDC." };
 
   const issues = planRungIssues(plan);
   if (issues.length) return { ok: false, status: 400, message: issues[0]! };

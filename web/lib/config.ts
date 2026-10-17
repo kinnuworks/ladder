@@ -11,6 +11,7 @@ export interface PublicConfig {
   exampleErrand: Address | null;
   examplePlan: string | null;
   repoUrl: string | null;
+  payboxInstallUrl: string | null;
 }
 
 function addr(v: string | undefined): Address | null {
@@ -28,6 +29,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     exampleErrand: addr(env.EXAMPLE_ERRAND?.trim()),
     examplePlan: env.EXAMPLE_PLAN?.trim() || null,
     repoUrl: env.REPO_URL?.trim().replace(/\/+$/, "") || null,
+    payboxInstallUrl: env.PAYBOX_INSTALL_URL?.trim() || null,
   };
 }
 
@@ -49,4 +51,11 @@ export function requireConfig(cfg = readConfig()) {
   if (!cfg.publicUrl) missing.push("PUBLIC_URL");
   if (missing.length) throw new ConfigError(`Server is missing ${missing.join(", ")}.`);
   return cfg as PublicConfig & { factory: Address; implementation: Address; rpcUrl: string; publicUrl: string };
+}
+
+/** Where "Add to PayBox" points: the configured install link, else the plugin's source, else the page section. */
+export function installUrl(cfg: PublicConfig): string {
+  if (cfg.payboxInstallUrl) return cfg.payboxInstallUrl;
+  if (cfg.repoUrl) return `${cfg.repoUrl}/tree/HEAD/plugin`;
+  return "/#add";
 }

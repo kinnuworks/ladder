@@ -41,14 +41,24 @@ export function rungsFor(brief: Brief, include: RailId[]): Rung[] {
   return out;
 }
 
-export function makePlan(input: { owner: string; brief: Brief; include: RailId[]; budgetUsd: number; hours: number }): Plan {
+export function makePlan(input: { owner: string; brief: Brief; include: RailId[]; budgetUsd?: number; hours: number }): Plan {
   const owner = getAddress(input.owner);
   const rungs = rungsFor(input.brief, input.include);
   const { root } = buildTree(rungs.map(rungLeaf));
   const session = newSessionKey();
   const expiry = Math.floor(Date.now() / 1000) + Math.round(input.hours * 3600);
   const terms = { factory: FACTORY, implementation: IMPLEMENTATION, owner, sessionSigner: session.address, expiry, rungsRoot: root };
-  const budget = BigInt(Math.round(input.budgetUsd * 1e6));
+  if (input.brief.business.timeZone) {
+    try {
+      new Intl.DateTimeFormat("en-US", { timeZone: input.brief.business.timeZone });
+    } catch {
+      throw new Error(`Unknown time zone ${input.brief.business.timeZone}; use an IANA name like America/Chicago.`);
+    }
+  }
+  if (rungs.some((r) => r.rail === "phone") && !input.brief.business.timeZone) throw new Error("Phone steps need business_timezone.");
+  const caps = rungs.reduce((t, r) => t + r.max, 0n);
+  const budget = input.budgetUsd === undefined ? caps : BigInt(Math.round(input.budgetUsd * 1e6));
+  if (budget < 1_000_000n) throw new Error("The budget must be at least $1.");
   const errand = predictErrand(terms);
   const key = encodeErrandKey({
     v: 1,

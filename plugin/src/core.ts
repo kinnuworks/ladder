@@ -256,6 +256,8 @@ export interface Brief {
   forName: string;
   business: {
     name: string;
+    /** IANA time zone, used to call only during business hours. */
+    timeZone?: string;
     phone?: string;
     email?: string;
     address?: { line1: string; line2?: string; city: string; state: string; zip: string };
