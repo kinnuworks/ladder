@@ -38,7 +38,8 @@
 .approval__amount { font: 700 34px/1 var(--font-display); letter-spacing: -0.04em; }
 .approval ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .approval li { display: flex; justify-content: space-between; gap: 12px; padding: 8px 10px; border-radius: var(--r-sm); background: var(--sunk); }
-.approval li span:last-child { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); white-space: nowrap; }
+.approval li { flex-wrap: wrap; }
+.approval li span:last-child { font-family: var(--font-mono); font-size: 12.5px; color: var(--ink-2); overflow-wrap: anywhere; text-align: right; }
 .approval .btn { width: 100%; }
 .float .inner { display: flex; align-items: center; gap: 10px; }
 .float .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex: none; }

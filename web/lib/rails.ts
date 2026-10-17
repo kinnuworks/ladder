@@ -44,7 +44,7 @@ export const RAILS: readonly Rail[] = [
     service: "Certified mail",
     payTo: null,
     paymentLabel: "PostalForm order deposit",
-    price: "$11.40 to $14.40",
+    price: "about $14.40",
     cap: 15_000_000n,
   },
 ];

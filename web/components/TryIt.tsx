@@ -29,10 +29,10 @@ const TYPES = [
 ] as const;
 
 const STEPS = [
-  { id: "call", label: "AI call", detail: "StablePhone", cap: 0.54 },
-  { id: "followup", label: "Follow-up AI call", detail: "StablePhone", cap: 0.54 },
-  { id: "person", label: "A person calls", detail: "Mosbie", cap: 15 },
-  { id: "letter", label: "Certified letter", detail: "PostalForm", cap: 15 },
+  { id: "call", label: "AI call", detail: "StablePhone", note: "$0.54", cap: 0.54 },
+  { id: "followup", label: "Follow-up AI call", detail: "StablePhone", note: "$0.54", cap: 0.54 },
+  { id: "person", label: "A person calls (optional)", detail: "Mosbie", note: "$15", cap: 15 },
+  { id: "letter", label: "Certified letter", detail: "PostalForm", note: "about $14.40", cap: 15 },
 ] as const;
 
 const money = (n: number) => `$${n.toFixed(2)}`;
@@ -40,12 +40,13 @@ const money = (n: number) => `$${n.toFixed(2)}`;
 export function TryIt() {
   const [type, setType] = useState<(typeof TYPES)[number]["id"]>("cancel");
   const [budget, setBudget] = useState(30);
-  const [on, setOn] = useState<Record<string, boolean>>({ call: true, followup: true, person: true, letter: true });
+  const [on, setOn] = useState<Record<string, boolean>>({ call: true, followup: true, person: false, letter: true });
   const t = TYPES.find((x) => x.id === type)!;
   const chosen = STEPS.filter((s) => on[s.id]);
   const runnable = chosen.filter((s) => s.cap <= budget);
   const capsTotal = runnable.reduce((a, s) => a + s.cap, 0);
-  const maxSpend = Math.min(budget, capsTotal);
+  // The errand is funded with the caps it could need, never more than the limit you set.
+  const funded = Math.min(budget, Math.round(capsTotal * 100) / 100);
   const first = runnable[0];
 
   return (
@@ -71,7 +72,7 @@ export function TryIt() {
         </div>
         <div className="control">
           <label htmlFor="try-budget">
-            Budget <span className="t-mono">{money(budget)}</span>
+            Spending limit <span className="t-mono">{money(budget)}</span>
           </label>
           <input
             id="try-budget"
@@ -92,7 +93,7 @@ export function TryIt() {
               <span>
                 {s.label}
                 <small>
-                  {s.detail}, cap {money(s.cap)}
+                  {s.detail}, {s.note}, cap {money(s.cap)}
                 </small>
               </span>
               <input
@@ -129,7 +130,7 @@ export function TryIt() {
                   <li key={s.id} className={s.cap > budget ? "is-off" : ""}>
                     <span>
                       {i + 1}. {s.label} via {s.detail}
-                      {s.cap > budget && <span className="t-micro"> (cap is above the budget)</span>}
+                      {s.cap > budget && <span className="t-micro"> (cap is above the limit)</span>}
                     </span>
                     <span className="mono">at most {money(s.cap)}, once</span>
                   </li>
@@ -138,15 +139,11 @@ export function TryIt() {
             )}
             <div className="preview__sum">
               <span>You approve one payment of</span>
-              <span className="mono">{money(budget)}</span>
-              <span>Most the errand can spend</span>
-              <span className="mono">{money(maxSpend)}</span>
-              <span>Always comes back to you</span>
-              <span className="mono">{money(budget - maxSpend)}</span>
+              <span className="mono">{money(funded)}</span>
               {first && (
                 <>
                   <span>Comes back if step 1 settles it</span>
-                  <span className="mono">{money(budget - first.cap)}</span>
+                  <span className="mono">{money(funded - first.cap)}</span>
                 </>
               )}
             </div>

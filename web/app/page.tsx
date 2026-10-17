@@ -21,22 +21,25 @@ export const dynamic = "force-dynamic";
 const RUNGS = [
   { title: "AI call", detail: "StablePhone calls the business", cap: "$0.54" },
   { title: "Follow-up AI call", detail: "StablePhone calls again", cap: "$0.54" },
-  { title: "A person calls", detail: "Mosbie, results by email", cap: "$15.00" },
-  { title: "Certified letter", detail: "PostalForm, USPS with return receipt", cap: "$15.00" },
+  { title: "A person calls (optional)", detail: "Mosbie, results by email", cap: "$15.00" },
+  { title: "Certified letter", detail: "PostalForm, about $14.40", cap: "$15.00" },
 ];
+
+const SAFETY =
+  "The errand can only send each step's cap to that step's one-time key, once, before the expiry. The plugin checks the service's address and price before that key pays.";
 
 const FAQ = [
   {
     q: "Where does it work?",
-    a: "In the US only. StablePhone and Mosbie call US phone numbers, and PostalForm mails to US postal addresses.",
+    a: "In the US only. StablePhone (and Mosbie, if you add the optional person call) call US phone numbers, and PostalForm mails to US postal addresses.",
   },
   {
     q: "How long does the letter step take?",
-    a: "PostalForm prints the letter and sends it by USPS Certified Mail with a return receipt. Delivery takes a few days, and the tracking number shows up once it is mailed.",
+    a: "PostalForm prints the letter and sends it by USPS Certified Mail with an electronic return receipt, for about $14.40. The step is capped at $15. Delivery takes a few days, and the tracking number shows up once it is mailed.",
   },
   {
     q: "How do I hear what the person said on the call?",
-    a: "Mosbie emails the result to the address you give the agent when it plans the errand.",
+    a: "The person call is optional and costs $15. If you add it, Mosbie emails the result to the address you give the agent when it plans the errand.",
   },
   {
     q: "Who pays the gas?",
@@ -44,7 +47,7 @@ const FAQ = [
   },
   {
     q: "What stops the agent from spending on something else?",
-    a: "The errand contract approves a payment only when it matches a committed step, stays within that step's cap, is that step's first payment and lands before expiry. USDC asks the contract before every transfer, so any other payment fails.",
+    a: `${SAFETY} So the most any step can cost you is its cap, and what a step key does not spend goes back to you.`,
   },
   {
     q: "What happens to money a step key did not spend?",
@@ -57,6 +60,10 @@ const FAQ = [
   {
     q: "Has the code been audited?",
     a: "No. The contracts are short and covered by unit, fuzz, invariant and fork tests, but nobody has audited them. Start with small budgets.",
+  },
+  {
+    q: "What if the money arrives but the errand never opens?",
+    a: "This site refuses to fund an errand unless Ladder's factory is deployed, and the relayer opens the errand in the same request that moves the money. If USDC ever reaches an errand address that was not opened, anyone with its terms can open it and refund it to you. The daily cleanup only finds errands that were opened.",
   },
 ];
 
@@ -80,8 +87,8 @@ export default function Home() {
             Get a real errand <em className="t-serif">done</em> with one approval.
           </h1>
           <p className="lead">
-            Tell your AI what you need and how much it may spend. It calls the business, brings in a person if that
-            fails, then sends a certified letter. Money it does not use comes back to you.
+            Tell your AI what you need and how much it may spend. It calls the business, calls again if needed, then
+            sends a certified letter. Money it does not use comes back to you.
           </p>
           <div className="cta-row">
             <a className="btn btn-candy btn-lg" href={add}>
@@ -118,14 +125,14 @@ export default function Home() {
                       <ol>
                         <li>AI call to Northside Gym, up to $0.54</li>
                         <li>Follow-up AI call, up to $0.54</li>
-                        <li>A person calls for you, up to $15</li>
                         <li>Certified letter with return receipt, up to $15</li>
                       </ol>
-                      Anything left goes back to your wallet. Approve $30 in PayBox to start.
+                      That is at most $16.08. I can add a person who calls for you (optional, up to $15). Anything a
+                      step does not use comes back to your wallet.
                     </div>
                     <div className="msg ai">
                       <span className="who">Assistant</span>
-                      The gym needs written notice, so I sent the certified letter. You got $14.52 back.
+                      The gym needs written notice, so I sent the certified letter. $0.60 came back to you.
                     </div>
                   </div>
                 </div>
@@ -141,33 +148,22 @@ export default function Home() {
                   </div>
                   <div className="approval">
                     <div className="approval__head">
-                      <span className="t-micro">One payment on Base</span>
-                      <span className="chip chip--soft">USDC</span>
+                      <span className="t-micro">Payment request</span>
+                      <span className="chip chip--soft">x402</span>
                     </div>
-                    <div className="approval__amount">$30.00</div>
-                    <div className="t-micro">
-                      To errand <span className="t-mono">0x7a3f…c41e</span>, which can only pay:
-                    </div>
+                    <div className="approval__amount">$16.08</div>
+                    <div className="t-micro">USDC on Base</div>
                     <ul>
                       <li>
-                        <span>AI call</span>
-                        <span>$0.54, once</span>
+                        <span>Pay to</span>
+                        <span>0x7a3f…c41e (example)</span>
                       </li>
                       <li>
-                        <span>Follow-up AI call</span>
-                        <span>$0.54, once</span>
-                      </li>
-                      <li>
-                        <span>A person calls</span>
-                        <span>$15.00, once</span>
-                      </li>
-                      <li>
-                        <span>Certified letter</span>
-                        <span>$15.00, once</span>
+                        <span>Endpoint</span>
+                        <span>ladder-errands.vercel.app/api/fund</span>
                       </li>
                     </ul>
-                    <div className="t-micro">The rest returns to you. Expires in 72 hours.</div>
-                    <span className="btn btn-candy">Approve with passkey</span>
+                    <span className="btn btn-candy">Approve</span>
                   </div>
                 </div>
               </div>
@@ -188,7 +184,7 @@ export default function Home() {
                 <div className="inner">
                   <span className="dot" />
                   <span>
-                    <b>Refunded $14.52</b> to you
+                    <b>$0.60</b> back to you
                   </span>
                 </div>
               </div>
@@ -204,7 +200,7 @@ export default function Home() {
               <span className="dot" />
               Why Ladder
             </span>
-            <h2>Some errands need a call, a person and a letter.</h2>
+            <h2>Some errands need a call, a second call and a letter.</h2>
             <p className="lead">
               Cancelling a membership or chasing a refund often means escalating. Ladder lets an agent escalate for you
               inside limits you set once.
@@ -221,8 +217,7 @@ export default function Home() {
             <div className="card card--flat card--chosen reveal" style={{ ["--i" as string]: 1 }}>
               <h3 className="t-title">With Ladder</h3>
               <p className="t-small" style={{ marginTop: 8 }}>
-                You approve one payment. The agent works up the steps you agreed to, and the errand contract on Base
-                refuses any payment outside that plan.
+                You approve one payment and the agent works up the steps you agreed to. {SAFETY}
               </p>
             </div>
           </div>
@@ -239,8 +234,9 @@ export default function Home() {
               </span>
               <h3>The agent starts with the cheapest step.</h3>
               <p className="t-small">
-                The first rung is a $0.54 AI phone call. If the business wants more, a person calls for $15, and the top
-                rung is a USPS Certified Mail letter. Every rung and its cap is fixed when you approve.
+                The first rung is a $0.54 AI phone call, then a follow-up call. The top rung is a USPS Certified Mail
+                letter with electronic return receipt, about $14.40 and capped at $15. A person who calls for $15 is
+                optional. Every rung and its cap is fixed when you approve.
               </p>
               <div className="chips">
                 <span className="chip">Each rung pays once</span>
@@ -250,7 +246,10 @@ export default function Home() {
             </div>
             <div className="stage stage--soft reveal">
               <div className="card">
-                <Ladder title="The four rungs of a Ladder errand and their caps" rungs={RUNGS} />
+                <Ladder
+                  title="The rungs of a Ladder errand and their caps; the person call is optional"
+                  rungs={RUNGS}
+                />
               </div>
             </div>
           </div>
@@ -262,25 +261,24 @@ export default function Home() {
                 What the chain enforces
               </span>
               <h3>The contract holds the agent to the plan.</h3>
-              <p className="t-small">
-                The agent decides what to say and when to move up a rung. The errand contract on Base decides where the
-                money can go, and USDC checks with it before every transfer.
-              </p>
+              <p className="t-small">The agent decides what to say and when to move up a rung. {SAFETY}</p>
             </div>
             <div className="stage stage--soft reveal">
               <div className="guarantees">
-                {[
-                  ["Pay only the steps you approved", true],
-                  ["Each step at most once, up to its cap", true],
-                  ["Nothing after the expiry", true],
-                  ["Refunds only to your wallet", true],
-                  ["What to say on the call", false],
-                  ["When to move up a rung", false],
-                ].map(([text, chain]) => (
-                  <div className="row" key={String(text)}>
+                {(
+                  [
+                    ["Send each step's cap only to that step's one-time key", "chain"],
+                    ["Each step at most once, before the expiry", "chain"],
+                    ["Refunds only to your wallet", "chain"],
+                    ["The service's address and price before a step key pays", "plugin"],
+                    ["What to say on the call", "agent"],
+                    ["When to move up a rung", "agent"],
+                  ] as const
+                ).map(([text, who]) => (
+                  <div className="row" key={text}>
                     <span>{text}</span>
-                    <span className={`who-tag${chain ? " chain" : ""}`}>
-                      {chain ? "Base enforces" : "Agent decides"}
+                    <span className={`who-tag${who === "chain" ? " chain" : ""}`}>
+                      {who === "chain" ? "Base enforces" : who === "plugin" ? "Plugin checks" : "Agent decides"}
                     </span>
                   </div>
                 ))}
@@ -310,6 +308,7 @@ export default function Home() {
               )}
             </div>
             <div className="stage stage--soft reveal" aria-hidden="true">
+              <span className="chip example-chip">Example</span>
               <div className="window">
                 <div className="window__bar">
                   <div className="lights">
@@ -317,16 +316,19 @@ export default function Home() {
                     <i />
                     <i />
                   </div>
-                  <span className="window__title">Errand timeline</span>
+                  <span className="window__title">Errand timeline (example)</span>
                 </div>
                 <div className="mini-timeline">
                   {[
-                    ["Funded by owner", "Errand", "$30.00"],
+                    ["Funded by owner", "Errand", "$16.08"],
                     ["Released to step 1 key", "AI call", "$0.54"],
                     ["Step 1 key paid StablePhone", "StablePhone call", "$0.54"],
                     ["Released to step 2 key", "Follow-up AI call", "$0.54"],
-                    ["Step 4 key paid PostalForm", "PostalForm order deposit", "$14.40"],
-                    ["Refund to owner", "Owner", "$14.52"],
+                    ["Step 2 key paid StablePhone", "StablePhone call", "$0.54"],
+                    ["Released to step 3 key", "Certified letter", "$15.00"],
+                    ["Step 3 key paid PostalForm", "PostalForm order deposit", "$14.40"],
+                    ["Step 3 key returned the rest", "Owner", "$0.60"],
+                    ["Refund of the errand balance", "Owner", "$0.00"],
                   ].map(([what, to, amt]) => (
                     <div className="row" key={what}>
                       <span>
@@ -351,7 +353,9 @@ export default function Home() {
               Try it here
             </span>
             <h2>Build a mandate and see what it allows.</h2>
-            <p className="lead">Pick an errand, a budget and the steps. The preview shows what you would approve.</p>
+            <p className="lead">
+              Pick an errand, a spending limit and the steps. The preview shows what you would approve.
+            </p>
           </div>
           <TryIt />
         </div>

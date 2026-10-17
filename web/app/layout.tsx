@@ -8,7 +8,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: { default: "Ladder", template: "%s · Ladder" },
   description:
-    "Ladder is a PayBox plugin. One approval funds an errand account on Base that pays only the steps you agreed to, each once and up to its cap, and returns the rest to you.",
+    "Ladder is a PayBox plugin. One approval funds an errand account on Base that can only send each step's cap to that step's one-time key, once, before the expiry. What is left comes back to you.",
 };
 
 export const viewport: Viewport = { themeColor: "#FFFFFF" };
