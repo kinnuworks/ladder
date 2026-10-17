@@ -64,7 +64,7 @@ Ladder is a PayBox plugin. While it awaits PayBox's review it is installable onl
 
 To run your own copy: build `plugin/` (below), upload `plugin/dist/plugin.mjs` in the [PayBox developer portal](https://developer.paybox.sh), and allow these network hosts: `ladder-errands.vercel.app`, `stablephone.dev`, `api.mosbie.com`, `postalform.com`, `mainnet.base.org`. Then enable it under Plugins in the PayBox app and ask your agent to plan an errand.
 
-Contracts on Base: ErrandFactory [`0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c`](https://basescan.org/address/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c), Errand implementation [`0xc580544b22560C97f360d3e40Fb48464D85E7c06`](https://basescan.org/address/0xc580544b22560C97f360d3e40Fb48464D85E7c06), both verified on [Sourcify](https://repo.sourcify.dev/8453/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c).
+Contracts on Base: ErrandFactory [`0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c`](https://basescan.org/address/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c), Errand implementation [`0xc580544b22560C97f360d3e40Fb48464D85E7c06`](https://basescan.org/address/0xc580544b22560C97f360d3e40Fb48464D85E7c06), both with verified source on Basescan and [Sourcify](https://repo.sourcify.dev/8453/0x8FF52968512024B5bfDe1e1eCCb3EE1f10A4A01c).
 
 ## Run it
 
